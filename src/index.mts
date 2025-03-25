@@ -124,12 +124,16 @@ class OpenAIProvider implements AIProvider {
             }
         }
 
-        const completionOptions = {
+        const completionOptions: any = {
             model: config.openaiModel || 'gpt-4o',
             messages,
-            max_tokens: options.maxTokens,
             stream: options.stream,
         };
+        if (completionOptions.model.startsWith('o')) {
+            completionOptions.max_completion_tokens = options.maxTokens
+        } else {
+            completionOptions.max_tokens = options.maxTokens
+        }
 
         if (options.stream) {
             const stream = await this.client.chat.completions.create(completionOptions);
