@@ -433,19 +433,17 @@ export default () => `
                     const data = await response.json();
                     if (response.ok) {
                         const newConvoId = data.id;
-                        loadConversations();
-                        setTimeout(() => {
-                            const newConvo = state.conversations.find(c => c.id === newConvoId);
-                            if (newConvo) {
-                                state.selectedConvo = newConvo.id;
-                                document.querySelector('.view-conversation h2').textContent = \`Conversation: \${newConvo.title}\`;
-                                loadMessages(newConvo.id);
-                                setView('conversation', newConvo.id);
-                                document.querySelectorAll('.convo-item').forEach(item => item.classList.remove('selected'));
-                                const newItem = Array.from(document.getElementById('convo-list').children).find(item => item.textContent.includes(newConvo.title));
-                                if (newItem) newItem.classList.add('selected');
-                            }
-                        }, 100);
+                        await loadConversations();
+                        const newConvo = state.conversations.find(c => c.id === newConvoId);
+                        if (newConvo) {
+                            state.selectedConvo = newConvo.id;
+                            document.querySelector('.view-conversation h2').textContent = \`Conversation: \${newConvo.title}\`;
+                            loadMessages(newConvo.id);
+                            setView('conversation', newConvo.id);
+                            document.querySelectorAll('.convo-item').forEach(item => item.classList.remove('selected'));
+                            const newItem = Array.from(document.getElementById('convo-list').children).find(item => item.textContent.includes(newConvo.title));
+                            if (newItem) newItem.classList.add('selected');
+                        }
                     } else {
                         alert(data.message);
                     }
@@ -737,8 +735,9 @@ export default () => `
             const token = localStorage.getItem('token');
             if (token) {
                 state.token = token;
-                loadConversations();
-                handleHashChange();
+                loadConversations().then(() => {
+                    handleHashChange();
+                });
             } else {
                 setView('login');
             }
