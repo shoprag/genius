@@ -21,6 +21,7 @@ import validator from 'validator';
 import xss from 'xss';
 import tiktoken from 'tiktoken-node';
 import sgMail from '@sendgrid/mail';
+import crypto from 'crypto';
 import UI from './UI.mjs'
 
 // Load environment variables initially
@@ -282,7 +283,7 @@ if (missingConfigs.length > 0) {
             name: 'jwtSecret',
             message: 'Enter JWT secret key:',
             when: !config.jwtSecret,
-            default: () => require('crypto').randomBytes(32).toString('hex'),
+            default: () => crypto.randomBytes(32).toString('hex'),
         },
         {
             type: 'input',
