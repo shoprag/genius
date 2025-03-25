@@ -343,7 +343,7 @@ const db = knex(knexConfig);
  */
 async function runMigrations() {
     await db.migrate.latest({
-        directory: path.join(__dirname, 'migrations'),
+        directory: path.join(process.cwd(), 'migrations'),
         loadExtensions: ['.ts'],
         migrationSource: {
             async getMigrations() {
