@@ -27,6 +27,9 @@ export default () => `
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
         #menu-toggle {
@@ -56,10 +59,20 @@ export default () => `
 
         .sidebar {
             width: 250px;
-            padding: 20px;
             background: #1f1f1f;
             border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+        }
+
+        .sidebar-content {
+            flex: 1;
             overflow-y: auto;
+            padding: 0 20px 20px 20px;
         }
 
         #close-sidebar {
@@ -102,6 +115,9 @@ export default () => `
 
         .view-conversation {
             max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
 
         .view.active {
@@ -143,6 +159,7 @@ export default () => `
             color: #ffffff;
             cursor: pointer;
             transition: background-color 0.3s ease, transform 0.2s ease;
+            user-select: none; /* Prevent text selection */
         }
 
         button:hover {
@@ -173,6 +190,7 @@ export default () => `
             border-radius: 5px;
             margin-bottom: 10px;
             cursor: pointer;
+            user-select: none; /* Prevent text selection */
         }
 
         .convo-item.selected {
@@ -190,12 +208,6 @@ export default () => `
         }
 
         /* Messages Area */
-        .view-conversation {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-
         .messages-container {
             flex: 1;
             overflow-y: auto;
@@ -276,6 +288,42 @@ export default () => `
             padding: 10px 20px;
         }
 
+        /* Typing Indicator */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 10px;
+            background: #2a2a2a;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .typing-indicator span {
+            width: 10px;
+            height: 10px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            animation: bounce 1.2s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
         /* Animations */
         @keyframes slideIn {
             from { transform: translateY(20px); opacity: 0; }
@@ -341,11 +389,15 @@ export default () => `
     <div class="backdrop"></div>
     <main>
         <div class="sidebar">
-            <button id="close-sidebar">Close</button>
-            <h2>Conversations</h2>
-            <button id="create-convo">New Conversation</button>
-            <button id="clear-all">Clear All</button>
-            <div id="convo-list"></div>
+            <div class="sidebar-header">
+                <button id="close-sidebar">Close</button>
+                <h2>Conversations</h2>
+                <button id="create-convo">New Conversation</button>
+                <button id="clear-all">Clear All</button>
+            </div>
+            <div class="sidebar-content">
+                <div id="convo-list"></div>
+            </div>
         </div>
         <div class="content">
             <!-- Login View -->
@@ -394,7 +446,7 @@ export default () => `
                     <div id="messages"></div>
                 </div>
                 <form id="send-form">
-                    <textarea id="message-input" placeholder="Type your message (Ctrl+Enter to send)" rows="3"></textarea>
+                    <textarea id="message-input" placeholder="Type your message (Enter to send, Shift+Enter for new line)" rows="3"></textarea>
                     <button type="submit">Send</button>
                 </form>
             </div>
@@ -418,6 +470,8 @@ export default () => `
             selectedConvo: null,
             messages: [],
         };
+
+        let typingIndicator = null;
 
         // Utility Functions
         function setView(viewName, convoId = null) {
@@ -561,7 +615,7 @@ export default () => `
                             loadMessages(newConvo.id);
                             setView('conversation', newConvo.id);
                             document.querySelectorAll('.convo-item').forEach(item => item.classList.remove('selected'));
-                            const newItem = Array.from(document.getElementById('convo-list').children).find(item => item.textContent.includes(newConvo.title));
+                            const newItem = document.querySelector(\`.convo-item[data-id="\${newConvo.id}"]\`);
                             if (newItem) newItem.classList.add('selected');
                         }
                     } else {
@@ -603,13 +657,24 @@ export default () => `
 
         document.getElementById('send-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const message = document.getElementById('message-input').value;
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
             if (!message) return;
+
+            // Disable input while waiting for response
+            messageInput.disabled = true;
 
             // Display user message
             state.messages.push({ role: 'user', content: message });
             renderMessages();
-            document.getElementById('message-input').value = '';
+
+            // Add typing indicator
+            typingIndicator = document.createElement('div');
+            typingIndicator.className = 'typing-indicator';
+            typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+            document.getElementById('messages').appendChild(typingIndicator);
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
             try {
                 const response = await fetch(\`/send/\${state.selectedConvo}\`, {
@@ -624,6 +689,12 @@ export default () => `
                 if (!response.ok) {
                     const data = await response.json();
                     alert(data.message);
+                    if (typingIndicator) {
+                        typingIndicator.remove();
+                        typingIndicator = null;
+                    }
+                    messageInput.disabled = false;
+                    messageInput.focus();
                     return;
                 }
 
@@ -632,13 +703,19 @@ export default () => `
                 let liveMessage = '';
                 const assistantMsg = { role: 'assistant', content: '' };
                 state.messages.push(assistantMsg);
-                const messagesDiv = document.getElementById('messages');
 
                 async function read() {
                     const { done, value } = await reader.read();
                     if (done) {
                         assistantMsg.content = liveMessage;
+                        if (typingIndicator) {
+                            typingIndicator.remove();
+                            typingIndicator = null;
+                        }
                         renderMessages();
+                        messageInput.value = ''; // Clear field after successful response
+                        messageInput.disabled = false;
+                        messageInput.focus();
                         return;
                     }
                     const chunk = decoder.decode(value);
@@ -664,11 +741,18 @@ export default () => `
             } catch (err) {
                 console.error('Send message error:', err);
                 alert('An error occurred while sending message');
+                if (typingIndicator) {
+                    typingIndicator.remove();
+                    typingIndicator = null;
+                }
+                messageInput.disabled = false;
+                messageInput.focus();
             }
         });
 
         document.getElementById('message-input').addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 document.getElementById('send-form').dispatchEvent(new Event('submit'));
             }
         });
@@ -734,6 +818,7 @@ export default () => `
             state.conversations.forEach(convo => {
                 const div = document.createElement('div');
                 div.className = 'convo-item';
+                div.dataset.id = convo.id; // Add data-id for precise selection
                 if (state.selectedConvo == convo.id) {
                     div.classList.add('selected');
                 }
@@ -815,8 +900,17 @@ export default () => `
                 copyButton.className = 'copy-btn';
                 copyButton.textContent = 'Copy';
                 copyButton.addEventListener('click', () => {
-                    navigator.clipboard.writeText(msg.content);
-                    alert('Message copied to clipboard');
+                    navigator.clipboard.writeText(msg.content).then(() => {
+                        copyButton.textContent = 'Copied!';
+                        copyButton.style.backgroundColor = '#28a745'; // Green feedback
+                        setTimeout(() => {
+                            copyButton.textContent = 'Copy';
+                            copyButton.style.backgroundColor = '#ffc107'; // Reset to original
+                        }, 1000);
+                    }).catch(err => {
+                        console.error('Failed to copy: ', err);
+                        alert('Failed to copy message');
+                    });
                 });
                 headerDiv.appendChild(copyButton);
 
