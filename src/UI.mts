@@ -442,7 +442,7 @@ export default () => `
                         return;
                     }
                     const chunk = decoder.decode(value);
-                    const events = chunk.split('\n\n');
+                    const events = chunk.split('\\n\\n');
                     for (const event of events) {
                         if (event.startsWith('data: ')) {
                             const data = event.substring(6);
