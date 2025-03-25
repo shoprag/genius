@@ -46,6 +46,7 @@ interface Config {
     ollamaModel?: string;
     universeUrl: string;
     universeBearer: string;
+    universe: string;
     jwtSecret: string;
     sendgridApiKey: string;
     sendgridFromEmail: string;
@@ -206,6 +207,7 @@ program
     .option('--ollama-base-url <url>', 'Ollama base URL', process.env.OLLAMA_BASE_URL)
     .option('--ollama-model <model>', 'Ollama model', process.env.OLLAMA_MODEL || 'llama2')
     .option('--universe-url <url>', 'Universe API URL', process.env.UNIVERSE_URL)
+    .option('--universe <universe>', 'Universe to use', process.env.UNIVERSE)
     .option('--universe-bearer <token>', 'Universe API bearer token', process.env.UNIVERSE_BEARER)
     .option('--jwt-secret <secret>', 'JWT secret key', process.env.JWT_SECRET)
     .option('--sendgrid-api-key <key>', 'Sendgrid API key', process.env.SENDGRID_API_KEY)
@@ -218,7 +220,7 @@ program
 const config: Config = program.opts();
 
 // Setup wizard for missing essential configs
-const essentialConfigs = ['aiProvider', 'universeUrl', 'universeBearer', 'jwtSecret', 'sendgridApiKey', 'sendgridFromEmail'];
+const essentialConfigs = ['aiProvider', 'universeUrl', 'universe', 'universeBearer', 'jwtSecret', 'sendgridApiKey', 'sendgridFromEmail'];
 const missingConfigs = essentialConfigs.filter(key => !config[key]);
 
 function camelToUpperSnakeCase(str) {
@@ -271,6 +273,13 @@ if (missingConfigs.length > 0) {
             message: 'Enter Universe API bearer token:',
             when: !config.universeBearer,
             validate: input => input.trim() ? true : 'Bearer token is required!',
+        },
+        {
+            type: 'input',
+            name: 'universe',
+            message: 'Enter which universe to use for answers:',
+            when: !config.universe,
+            validate: input => input.trim() ? true : 'Universe is required!',
         },
         {
             type: 'input',
@@ -785,7 +794,7 @@ app.post('/send/:id', authenticate, async (req: Request & { user: { id: number }
 
         const thing = exclusive ? subject : subject ? `Relevant keywords: ${subject}\n\nInformation that will answer the question: ${message}` : message;
         const { data } = await axios.post(`${config.universeUrl}/resonate`, {
-            universe: 'bitcoin',
+            universe: config.universe,
             thing,
             reach: 10,
         }, {
