@@ -231,6 +231,10 @@ const config: Config = program.opts();
 const essentialConfigs = ['aiProvider', 'universeUrl', 'universeBearer', 'jwtSecret', 'sendgridApiKey', 'sendgridFromEmail'];
 const missingConfigs = essentialConfigs.filter(key => !config[key]);
 
+function camelToUpperSnakeCase(str) {
+    return str.replace(/[A-Z]/g, letter => `_${letter}`).toUpperCase();
+}
+
 if (missingConfigs.length > 0) {
     console.log(chalk.cyan('Welcome to Genius setup! 🤓'));
     console.log('Let’s configure your Genius system.');
@@ -304,7 +308,7 @@ if (missingConfigs.length > 0) {
     Object.assign(config, answers);
 
     const envContent = Object.entries(config)
-        .map(([key, value]) => `${key.toUpperCase()}=${value}`)
+        .map(([key, value]) => `${camelToUpperSnakeCase(key)}=${value}`)
         .join('\n');
     fs.writeFileSync(path.join(process.cwd(), '.env'), envContent);
     console.log(chalk.green('.env file created successfully! 🎉'));
