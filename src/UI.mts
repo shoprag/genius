@@ -6,6 +6,8 @@ export default () => `
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Genius System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/1.9.1/showdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.0/styles/dark.min.css">
     <style>
         /* General Styles */
         body {
@@ -21,14 +23,30 @@ export default () => `
             background-color: #1f1f1f;
             padding: 15px 20px;
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
         }
 
+        #menu-toggle {
+            display: none;
+            font-size: 24px;
+            background: none;
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+        }
+
         header h1 {
             margin: 0;
             font-size: 24px;
+        }
+
+        #user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         main {
@@ -44,12 +62,33 @@ export default () => `
             overflow-y: auto;
         }
 
+        #close-sidebar {
+            display: none;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
         .content {
             flex: 1;
             padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
+        }
+
+        .backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .backdrop.open {
+            display: block;
         }
 
         /* View Management */
@@ -59,6 +98,10 @@ export default () => `
             max-width: 600px;
             opacity: 0;
             transition: opacity 0.3s ease;
+        }
+
+        .view-conversation {
+            max-width: 800px;
         }
 
         .view.active {
@@ -78,16 +121,21 @@ export default () => `
             animation: slideIn 0.5s ease;
         }
 
-        input, button {
+        input, button, textarea {
             padding: 12px;
             font-size: 16px;
             border: none;
             border-radius: 5px;
         }
 
-        input {
+        input, textarea {
             background: #333;
             color: #fff;
+        }
+
+        textarea {
+            resize: none;
+            font-family: inherit;
         }
 
         button {
@@ -142,47 +190,90 @@ export default () => `
         }
 
         /* Messages Area */
-        #messages {
-            height: 400px;
-            overflow-y: auto;
-            border: 1px solid #333;
-            padding: 15px;
-            margin: 10px 0;
-            background: #1f1f1f;
-            border-radius: 10px;
+        .view-conversation {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            height: 100%;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: #1f1f1f;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        #messages {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
         .message {
-            position: relative;
-            max-width: 80%;
-            padding: 10px 15px;
-            border-radius: 10px;
-            animation: fadeIn 0.3s ease;
+            display: flex;
+            flex-direction: column;
         }
 
-        .message.user {
-            align-self: flex-end;
-            background: #007bff;
-            color: #fff;
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
         }
 
-        .message.assistant {
-            align-self: flex-start;
-            background: #28a745;
-            color: #fff;
+        .message-header .role {
+            font-weight: bold;
         }
 
-        .message button {
-            position: absolute;
-            top: 5px;
-            right: 5px;
+        .message-header .copy-btn {
             background: #ffc107;
             color: #000;
-            padding: 2px 5px;
+            padding: 5px 10px;
             font-size: 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .message-content {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        pre {
+            overflow-x: auto;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+        }
+
+        #send-form {
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            padding: 10px;
+            background: #1f1f1f;
+            border-radius: 10px;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background: #333;
+            color: #fff;
+            resize: none;
+        }
+
+        #send-form button {
+            padding: 10px 20px;
         }
 
         /* Animations */
@@ -202,13 +293,32 @@ export default () => `
                 flex-direction: column;
             }
             .sidebar {
-                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 250px;
+                height: 100%;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 1000;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            #menu-toggle {
+                display: block;
+            }
+            #close-sidebar {
+                display: block;
             }
             .content {
                 padding: 10px;
             }
             .view {
                 max-width: 100%;
+            }
+            #user-email {
+                display: none;
             }
         }
 
@@ -221,14 +331,17 @@ export default () => `
 </head>
 <body>
     <header>
+        <button id="menu-toggle">☰</button>
         <h1>Genius System</h1>
         <div id="user-info">
             <span id="user-email"></span>
             <button id="logout" style="display: none;">Logout</button>
         </div>
     </header>
+    <div class="backdrop"></div>
     <main>
         <div class="sidebar">
+            <button id="close-sidebar">Close</button>
             <h2>Conversations</h2>
             <button id="create-convo">New Conversation</button>
             <button id="clear-all">Clear All</button>
@@ -275,11 +388,13 @@ export default () => `
 
             <!-- Conversation View -->
             <div class="view view-conversation">
-                <h2>Conversation</h2>
+                <h2>Conversation: <span id="convo-title"></span></h2>
                 <button id="back-to-dashboard">Back to Dashboard</button>
-                <div id="messages"></div>
+                <div class="messages-container">
+                    <div id="messages"></div>
+                </div>
                 <form id="send-form">
-                    <input type="text" id="message-input" placeholder="Type your message" required>
+                    <textarea id="message-input" placeholder="Type your message (Ctrl+Enter to send)" rows="3"></textarea>
                     <button type="submit">Send</button>
                 </form>
             </div>
@@ -287,7 +402,12 @@ export default () => `
     </main>
 
     <script>
-        const showdownConverter = new showdown.Converter();
+        const showdownConverter = new showdown.Converter({
+            tables: true,
+            tasklists: true,
+            strikethrough: true,
+            simplifiedAutoLink: true
+        });
 
         // Application State
         const state = {
@@ -437,7 +557,7 @@ export default () => `
                         const newConvo = state.conversations.find(c => c.id == newConvoId);
                         if (newConvo) {
                             state.selectedConvo = newConvo.id;
-                            document.querySelector('.view-conversation h2').textContent = \`Conversation: \${newConvo.title}\`;
+                            document.getElementById('convo-title').textContent = newConvo.title;
                             loadMessages(newConvo.id);
                             setView('conversation', newConvo.id);
                             document.querySelectorAll('.convo-item').forEach(item => item.classList.remove('selected'));
@@ -487,20 +607,8 @@ export default () => `
             if (!message) return;
 
             // Display user message
-            const userMsgDiv = document.createElement('div');
-            userMsgDiv.className = 'message user';
-            userMsgDiv.textContent = message;
-            const userCopyButton = document.createElement('button');
-            userCopyButton.textContent = 'Copy';
-            userCopyButton.addEventListener('click', () => {
-                navigator.clipboard.writeText(message);
-                alert('Message copied to clipboard');
-            });
-            userMsgDiv.appendChild(userCopyButton);
-            document.getElementById('messages').appendChild(userMsgDiv);
-            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-
-            // Clear input
+            state.messages.push({ role: 'user', content: message });
+            renderMessages();
             document.getElementById('message-input').value = '';
 
             try {
@@ -522,21 +630,15 @@ export default () => `
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let liveMessage = '';
-                const assistantMsgDiv = document.createElement('div');
-                assistantMsgDiv.className = 'message assistant';
-                document.getElementById('messages').appendChild(assistantMsgDiv);
+                const assistantMsg = { role: 'assistant', content: '' };
+                state.messages.push(assistantMsg);
+                const messagesDiv = document.getElementById('messages');
 
                 async function read() {
                     const { done, value } = await reader.read();
                     if (done) {
-                        state.messages.push({ role: 'assistant', content: liveMessage });
-                        const copyButton = document.createElement('button');
-                        copyButton.textContent = 'Copy';
-                        copyButton.addEventListener('click', () => {
-                            navigator.clipboard.writeText(liveMessage);
-                            alert('Message copied to clipboard');
-                        });
-                        assistantMsgDiv.appendChild(copyButton);
+                        assistantMsg.content = liveMessage;
+                        renderMessages();
                         return;
                     }
                     const chunk = decoder.decode(value);
@@ -548,11 +650,8 @@ export default () => `
                                 const parsed = JSON.parse(data);
                                 if (parsed.message) {
                                     liveMessage += parsed.message;
-                                    const html = showdownConverter.makeHtml(liveMessage);
-                                    assistantMsgDiv.innerHTML = html;
-                                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-                                } else if (parsed.done) {
-                                    // Stream complete
+                                    assistantMsg.content = liveMessage;
+                                    renderMessages();
                                 }
                             } catch (err) {
                                 console.error('Error parsing SSE data:', err);
@@ -565,6 +664,12 @@ export default () => `
             } catch (err) {
                 console.error('Send message error:', err);
                 alert('An error occurred while sending message');
+            }
+        });
+
+        document.getElementById('message-input').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                document.getElementById('send-form').dispatchEvent(new Event('submit'));
             }
         });
 
@@ -587,6 +692,21 @@ export default () => `
             state.messages = [];
             setView('login');
             updateUserInfo();
+        });
+
+        document.getElementById('menu-toggle').addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.backdrop').classList.toggle('open');
+        });
+
+        document.getElementById('close-sidebar').addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.remove('open');
+            document.querySelector('.backdrop').classList.remove('open');
+        });
+
+        document.querySelector('.backdrop').addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.remove('open');
+            document.querySelector('.backdrop').classList.remove('open');
         });
 
         // Conversation Management
@@ -621,7 +741,7 @@ export default () => `
                 titleSpan.textContent = convo.title;
                 titleSpan.addEventListener('click', () => {
                     state.selectedConvo = convo.id;
-                    document.querySelector('.view-conversation h2').textContent = \`Conversation: \${convo.title}\`;
+                    document.getElementById('convo-title').textContent = convo.title;
                     loadMessages(convo.id);
                     setView('conversation', convo.id);
                     document.querySelectorAll('.convo-item').forEach(item => item.classList.remove('selected'));
@@ -680,23 +800,41 @@ export default () => `
             const messagesDiv = document.getElementById('messages');
             messagesDiv.innerHTML = '';
             state.messages.forEach(msg => {
-                const div = document.createElement('div');
-                div.className = \`message \${msg.role}\`;
-                if (msg.role === 'assistant') {
-                    const html = showdownConverter.makeHtml(msg.content);
-                    div.innerHTML = html;
-                } else {
-                    div.textContent = msg.content;
-                }
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message';
+
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'message-header';
+
+                const roleSpan = document.createElement('span');
+                roleSpan.className = 'role';
+                roleSpan.textContent = msg.role.charAt(0).toUpperCase() + msg.role.slice(1);
+                headerDiv.appendChild(roleSpan);
+
                 const copyButton = document.createElement('button');
+                copyButton.className = 'copy-btn';
                 copyButton.textContent = 'Copy';
                 copyButton.addEventListener('click', () => {
                     navigator.clipboard.writeText(msg.content);
                     alert('Message copied to clipboard');
                 });
-                div.appendChild(copyButton);
-                messagesDiv.appendChild(div);
+                headerDiv.appendChild(copyButton);
+
+                messageDiv.appendChild(headerDiv);
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                if (msg.role === 'assistant') {
+                    const html = showdownConverter.makeHtml(msg.content);
+                    contentDiv.innerHTML = html;
+                } else {
+                    contentDiv.textContent = msg.content;
+                }
+                messageDiv.appendChild(contentDiv);
+
+                messagesDiv.appendChild(messageDiv);
             });
+            hljs.highlightAll();
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
 
@@ -707,7 +845,7 @@ export default () => `
                 const convoId = hash.split('-')[1];
                 if (state.conversations.find(c => c.id == convoId)) {
                     state.selectedConvo = convoId;
-                    document.querySelector('.view-conversation h2').textContent = \`Conversation: \${state.conversations.find(c => c.id == convoId).title}\`;
+                    document.getElementById('convo-title').textContent = state.conversations.find(c => c.id == convoId).title;
                     loadMessages(convoId);
                     setView('conversation', convoId);
                 } else {
