@@ -705,7 +705,7 @@ export default () => `
             const hash = window.location.hash;
             if (hash.startsWith('#convo-')) {
                 const convoId = hash.split('-')[1];
-                if (state.conversations.find(c => c.id === convoId)) {
+                if (state.conversations.find(c => c.id == convoId)) {
                     state.selectedConvo = convoId;
                     document.querySelector('.view-conversation h2').textContent = \`Conversation: \${state.conversations.find(c => c.id === convoId).title}\`;
                     loadMessages(convoId);
