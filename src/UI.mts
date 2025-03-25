@@ -5,6 +5,7 @@ export default () => `
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Genius System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/1.9.1/showdown.min.js"></script>
     <style>
         /* General Styles */
         body {
@@ -31,8 +32,21 @@ export default () => `
         }
 
         main {
-            padding: 20px;
+            display: flex;
             min-height: calc(100vh - 100px);
+        }
+
+        .sidebar {
+            width: 250px;
+            padding: 20px;
+            background: #1f1f1f;
+            border-right: 1px solid #333;
+            overflow-y: auto;
+        }
+
+        .content {
+            flex: 1;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -101,25 +115,30 @@ export default () => `
             text-decoration: underline;
         }
 
-        /* Dashboard and Conversations */
-        #convo-list {
-            margin-top: 20px;
+        /* Conversations */
+        .convo-item {
             display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        #convo-list div {
-            background: #1f1f1f;
-            padding: 15px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: background-color 0.3s ease, transform 0.2s ease;
-        }
-
-        #convo-list div:hover {
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
             background: #2a2a2a;
-            transform: translateX(5px);
+            border-radius: 5px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .convo-item.selected {
+            background: #333;
+        }
+
+        .convo-item span {
+            flex: 1;
+        }
+
+        .convo-item button {
+            background: #dc3545;
+            padding: 5px 10px;
+            font-size: 14px;
         }
 
         /* Messages Area */
@@ -137,6 +156,7 @@ export default () => `
         }
 
         .message {
+            position: relative;
             max-width: 80%;
             padding: 10px 15px;
             border-radius: 10px;
@@ -155,6 +175,16 @@ export default () => `
             color: #fff;
         }
 
+        .message button {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #ffc107;
+            color: #000;
+            padding: 2px 5px;
+            font-size: 12px;
+        }
+
         /* Animations */
         @keyframes slideIn {
             from { transform: translateY(20px); opacity: 0; }
@@ -167,17 +197,24 @@ export default () => `
         }
 
         /* Responsive Design */
-        @media (max-width: 600px) {
+        @media (max-width: 767px) {
             main {
+                flex-direction: column;
+            }
+            .sidebar {
+                display: none;
+            }
+            .content {
                 padding: 10px;
             }
-
-            form {
-                padding: 15px;
-            }
-
             .view {
                 max-width: 100%;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .sidebar {
+                display: block;
             }
         }
     </style>
@@ -191,59 +228,67 @@ export default () => `
         </div>
     </header>
     <main>
-        <!-- Login View -->
-        <div class="view view-login">
-            <h2>Login</h2>
-            <form id="login-form">
-                <input type="email" id="login-email" placeholder="Email" required>
-                <input type="password" id="login-password" placeholder="Password" required>
-                <button type="submit">Login</button>
-            </form>
-            <p>Don't have an account? <a href="#" id="to-register">Register</a></p>
-        </div>
-
-        <!-- Register View -->
-        <div class="view view-register">
-            <h2>Register</h2>
-            <form id="register-form">
-                <input type="email" id="register-email" placeholder="Email" required>
-                <input type="password" id="register-password" placeholder="Password" required>
-                <button type="submit">Register</button>
-            </form>
-            <p>Already have an account? <a href="#" id="to-login">Login</a></p>
-        </div>
-
-        <!-- Verify Email View -->
-        <div class="view view-verify">
-            <h2>Verify Email</h2>
-            <form id="verify-form">
-                <input type="email" id="verify-email" placeholder="Email" required>
-                <input type="text" id="verify-code" placeholder="Verification Code" required>
-                <button type="submit">Verify</button>
-            </form>
-            <button id="resend-code">Resend Verification Code</button>
-        </div>
-
-        <!-- Dashboard View -->
-        <div class="view view-dashboard">
-            <h2>Dashboard</h2>
-            <button id="create-convo">Create New Conversation</button>
+        <div class="sidebar">
+            <h2>Conversations</h2>
+            <button id="create-convo">New Conversation</button>
+            <button id="clear-all">Clear All</button>
             <div id="convo-list"></div>
         </div>
+        <div class="content">
+            <!-- Login View -->
+            <div class="view view-login">
+                <h2>Login</h2>
+                <form id="login-form">
+                    <input type="email" id="login-email" placeholder="Email" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button type="submit">Login</button>
+                </form>
+                <p>Don't have an account? <a href="#" id="to-register">Register</a></p>
+            </div>
 
-        <!-- Conversation View -->
-        <div class="view view-conversation">
-            <h2>Conversation</h2>
-            <button id="back-to-dashboard">Back to Dashboard</button>
-            <div id="messages"></div>
-            <form id="send-form">
-                <input type="text" id="message-input" placeholder="Type your message" required>
-                <button type="submit">Send</button>
-            </form>
+            <!-- Register View -->
+            <div class="view view-register">
+                <h2>Register</h2>
+                <form id="register-form">
+                    <input type="email" id="register-email" placeholder="Email" required>
+                    <input type="password" id="register-password" placeholder="Password" required>
+                    <button type="submit">Register</button>
+                </form>
+                <p>Already have an account? <a href="#" id="to-login">Login</a></p>
+            </div>
+
+            <!-- Verify Email View -->
+            <div class="view view-verify">
+                <h2>Verify Email</h2>
+                <form id="verify-form">
+                    <input type="email" id="verify-email" placeholder="Email" required>
+                    <input type="text" id="verify-code" placeholder="Verification Code" required>
+                    <button type="submit">Verify</button>
+                </form>
+                <button id="resend-code">Resend Verification Code</button>
+            </div>
+
+            <!-- Dashboard View -->
+            <div class="view view-dashboard">
+                <p>Select a conversation from the list or create a new one.</p>
+            </div>
+
+            <!-- Conversation View -->
+            <div class="view view-conversation">
+                <h2>Conversation</h2>
+                <button id="back-to-dashboard">Back to Dashboard</button>
+                <div id="messages"></div>
+                <form id="send-form">
+                    <input type="text" id="message-input" placeholder="Type your message" required>
+                    <button type="submit">Send</button>
+                </form>
+            </div>
         </div>
     </main>
 
     <script>
+        const showdownConverter = new showdown.Converter();
+
         // Application State
         const state = {
             currentView: 'login',
@@ -255,10 +300,15 @@ export default () => `
         };
 
         // Utility Functions
-        function setView(viewName) {
+        function setView(viewName, convoId = null) {
             document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
             document.querySelector(\`.view-\${viewName}\`).classList.add('active');
             state.currentView = viewName;
+            if (viewName === 'conversation' && convoId) {
+                window.location.hash = \`#convo-\${convoId}\`;
+            } else {
+                window.location.hash = \`#\${viewName}\`;
+            }
         }
 
         function updateUserInfo() {
@@ -382,7 +432,20 @@ export default () => `
                     });
                     const data = await response.json();
                     if (response.ok) {
+                        const newConvoId = data.id;
                         loadConversations();
+                        setTimeout(() => {
+                            const newConvo = state.conversations.find(c => c.id === newConvoId);
+                            if (newConvo) {
+                                state.selectedConvo = newConvo.id;
+                                document.querySelector('.view-conversation h2').textContent = \`Conversation: \${newConvo.title}\`;
+                                loadMessages(newConvo.id);
+                                setView('conversation', newConvo.id);
+                                document.querySelectorAll('.convo-item').forEach(item => item.classList.remove('selected'));
+                                const newItem = Array.from(document.getElementById('convo-list').children).find(item => item.textContent.includes(newConvo.title));
+                                if (newItem) newItem.classList.add('selected');
+                            }
+                        }, 100);
                     } else {
                         alert(data.message);
                     }
@@ -393,7 +456,30 @@ export default () => `
             }
         });
 
+        document.getElementById('clear-all').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to delete all conversations?')) {
+                try {
+                    const response = await fetch('/convo/all', {
+                        method: 'DELETE',
+                        headers: { 'Authorization': \`Bearer \${state.token}\` },
+                    });
+                    if (response.ok) {
+                        loadConversations();
+                        state.selectedConvo = null;
+                        setView('dashboard');
+                    } else {
+                        const data = await response.json();
+                        alert(data.message);
+                    }
+                } catch (err) {
+                    console.error('Clear all convos error:', err);
+                    alert('An error occurred while clearing conversations');
+                }
+            }
+        });
+
         document.getElementById('back-to-dashboard').addEventListener('click', () => {
+            state.selectedConvo = null;
             setView('dashboard');
         });
 
@@ -406,6 +492,13 @@ export default () => `
             const userMsgDiv = document.createElement('div');
             userMsgDiv.className = 'message user';
             userMsgDiv.textContent = message;
+            const userCopyButton = document.createElement('button');
+            userCopyButton.textContent = 'Copy';
+            userCopyButton.addEventListener('click', () => {
+                navigator.clipboard.writeText(message);
+                alert('Message copied to clipboard');
+            });
+            userMsgDiv.appendChild(userCopyButton);
             document.getElementById('messages').appendChild(userMsgDiv);
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
 
@@ -439,6 +532,13 @@ export default () => `
                     const { done, value } = await reader.read();
                     if (done) {
                         state.messages.push({ role: 'assistant', content: liveMessage });
+                        const copyButton = document.createElement('button');
+                        copyButton.textContent = 'Copy';
+                        copyButton.addEventListener('click', () => {
+                            navigator.clipboard.writeText(liveMessage);
+                            alert('Message copied to clipboard');
+                        });
+                        assistantMsgDiv.appendChild(copyButton);
                         return;
                     }
                     const chunk = decoder.decode(value);
@@ -450,7 +550,8 @@ export default () => `
                                 const parsed = JSON.parse(data);
                                 if (parsed.message) {
                                     liveMessage += parsed.message;
-                                    assistantMsgDiv.textContent = liveMessage;
+                                    const html = showdownConverter.makeHtml(liveMessage);
+                                    assistantMsgDiv.innerHTML = html;
                                     document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
                                 } else if (parsed.done) {
                                     // Stream complete
@@ -511,16 +612,50 @@ export default () => `
 
         function renderConversations() {
             const convoList = document.getElementById('convo-list');
-            convoList.innerHTML = state.conversations.length ? '' : '<p>No conversations yet. Create one to start!</p>';
+            convoList.innerHTML = '';
             state.conversations.forEach(convo => {
                 const div = document.createElement('div');
-                div.textContent = convo.title;
-                div.addEventListener('click', () => {
+                div.className = 'convo-item';
+                if (state.selectedConvo === convo.id) {
+                    div.classList.add('selected');
+                }
+                const titleSpan = document.createElement('span');
+                titleSpan.textContent = convo.title;
+                titleSpan.addEventListener('click', () => {
                     state.selectedConvo = convo.id;
                     document.querySelector('.view-conversation h2').textContent = \`Conversation: \${convo.title}\`;
                     loadMessages(convo.id);
-                    setView('conversation');
+                    setView('conversation', convo.id);
+                    document.querySelectorAll('.convo-item').forEach(item => item.classList.remove('selected'));
+                    div.classList.add('selected');
                 });
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.addEventListener('click', async () => {
+                    if (confirm('Are you sure you want to delete this conversation?')) {
+                        try {
+                            const response = await fetch(\`/convo/\${convo.id}\`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': \`Bearer \${state.token}\` },
+                            });
+                            if (response.ok) {
+                                loadConversations();
+                                if (state.selectedConvo === convo.id) {
+                                    state.selectedConvo = null;
+                                    setView('dashboard');
+                                }
+                            } else {
+                                const data = await response.json();
+                                alert(data.message);
+                            }
+                        } catch (err) {
+                            console.error('Delete convo error:', err);
+                            alert('An error occurred while deleting conversation');
+                        }
+                    }
+                });
+                div.appendChild(titleSpan);
+                div.appendChild(deleteButton);
                 convoList.appendChild(div);
             });
         }
@@ -549,10 +684,52 @@ export default () => `
             state.messages.forEach(msg => {
                 const div = document.createElement('div');
                 div.className = \`message \${msg.role}\`;
-                div.textContent = msg.content;
+                if (msg.role === 'assistant') {
+                    const html = showdownConverter.makeHtml(msg.content);
+                    div.innerHTML = html;
+                } else {
+                    div.textContent = msg.content;
+                }
+                const copyButton = document.createElement('button');
+                copyButton.textContent = 'Copy';
+                copyButton.addEventListener('click', () => {
+                    navigator.clipboard.writeText(msg.content);
+                    alert('Message copied to clipboard');
+                });
+                div.appendChild(copyButton);
                 messagesDiv.appendChild(div);
             });
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Hash Change Handler
+        function handleHashChange() {
+            const hash = window.location.hash;
+            if (hash.startsWith('#convo-')) {
+                const convoId = hash.split('-')[1];
+                if (state.conversations.find(c => c.id === convoId)) {
+                    state.selectedConvo = convoId;
+                    document.querySelector('.view-conversation h2').textContent = \`Conversation: \${state.conversations.find(c => c.id === convoId).title}\`;
+                    loadMessages(convoId);
+                    setView('conversation', convoId);
+                } else {
+                    setView('dashboard');
+                }
+            } else if (hash === '#dashboard') {
+                setView('dashboard');
+            } else if (hash === '#login') {
+                setView('login');
+            } else if (hash === '#register') {
+                setView('register');
+            } else if (hash === '#verify') {
+                setView('verify');
+            } else {
+                if (state.token) {
+                    setView('dashboard');
+                } else {
+                    setView('login');
+                }
+            }
         }
 
         // Initialization
@@ -560,13 +737,15 @@ export default () => `
             const token = localStorage.getItem('token');
             if (token) {
                 state.token = token;
-                setView('dashboard');
                 loadConversations();
+                handleHashChange();
             } else {
                 setView('login');
             }
             updateUserInfo();
         });
+
+        window.addEventListener('hashchange', handleHashChange);
     </script>
 </body>
 </html>`

@@ -88,7 +88,7 @@ interface CompletionResponse {
  * Interface for AI providers
  */
 interface AIProvider {
-    getCompletion(messages: Message[], options: CompletionOptions): Promise<CompletionResponse | AsyncIterable<any>>;
+    getCompletion(messages: Message[], options: CompletionOptions): Promise<CompletionResponse | AsyncIterable<string>>;
 }
 
 /**
@@ -104,23 +104,12 @@ class OpenAIProvider implements AIProvider {
         });
     }
 
-    /**
-     * Moderates user input using OpenAI's Moderation API
-     * @param input - The text to moderate
-     * @returns Whether the input was flagged
-     */
     async moderateInput(input: string): Promise<boolean> {
         const response = await this.client.moderations.create({ input });
         return response.results[0].flagged;
     }
 
-    /**
-     * Gets a completion from OpenAI
-     * @param messages - Array of chat messages
-     * @param options - Completion options
-     * @returns Completion response or stream
-     */
-    async getCompletion(messages: Message[], options: CompletionOptions): Promise<CompletionResponse | AsyncIterable<any>> {
+    async getCompletion(messages: Message[], options: CompletionOptions): Promise<CompletionResponse | AsyncIterable<string>> {
         for (const msg of messages) {
             if (msg.role === 'user') {
                 const flagged = await this.moderateInput(msg.content);
@@ -137,7 +126,14 @@ class OpenAIProvider implements AIProvider {
         };
 
         if (options.stream) {
-            return await this.client.chat.completions.create(completionOptions) as any;
+            const stream = await this.client.chat.completions.create(completionOptions);
+            const contentStream = async function* () {
+                for await (const chunk of stream as any) {
+                    const content = chunk.choices[0]?.delta?.content;
+                    if (content) yield content;
+                }
+            };
+            return contentStream();
         } else {
             const completion = await this.client.chat.completions.create(completionOptions) as OpenAI.Chat.Completions.ChatCompletion;
             return { message: completion.choices[0].message.content || '' };
@@ -157,13 +153,7 @@ class OllamaProvider implements AIProvider {
         this.model = model || 'llama2';
     }
 
-    /**
-     * Gets a completion from Ollama
-     * @param messages - Array of chat messages
-     * @param options - Completion options
-     * @returns Completion response or stream
-     */
-    async getCompletion(messages: Message[], options: CompletionOptions): Promise<CompletionResponse | AsyncIterable<any>> {
+    async getCompletion(messages: Message[], options: CompletionOptions): Promise<CompletionResponse | AsyncIterable<string>> {
         const prompt = messages.map(m => `${m.role}: ${m.content}`).join('\n');
         const url = `${this.baseUrl}/api/generate`;
 
@@ -833,9 +823,9 @@ app.post('/send/:id', authenticate, async (req: Request & { user: { id: number }
         if (stream) {
             res.sseSetup();
             let liveMessage = '';
-            for await (const chunk of completion as AsyncIterable<any>) {
-                res.sseSend({ message: chunk });
-                liveMessage += chunk;
+            for await (const content of completion as AsyncIterable<string>) {
+                res.sseSend({ message: content });
+                liveMessage += content;
             }
             await db('messages').insert({ convo_id: convoId, role: 'assistant', content: liveMessage });
             res.sseSend({ done: true });
