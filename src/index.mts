@@ -27,6 +27,9 @@ import UI from './UI.mjs'
 // Load environment variables initially
 dotenv.config();
 
+// Create a fake migrations directory to stop Knex from causing issues.
+fs.mkdirSync(path.join(process.cwd(), 'migrations'))
+
 /**
  * Interface for Genius configuration
  */
