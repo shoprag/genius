@@ -53,6 +53,9 @@ interface Config {
     logLevel: string;
     genius: string;
     customGeniusJson?: string;
+    maxContextTokens: number;
+    maxResponseTokens: number;
+    universeReach: number;
 }
 
 /**
@@ -76,6 +79,7 @@ interface Message {
  */
 interface CompletionOptions {
     stream?: boolean;
+    maxTokens?: number;
 }
 
 /**
@@ -123,6 +127,7 @@ class OpenAIProvider implements AIProvider {
         const completionOptions = {
             model: config.openaiModel || 'gpt-4o',
             messages,
+            max_tokens: options.maxTokens,
             stream: options.stream,
         };
 
@@ -215,9 +220,40 @@ program
     .option('--log-level <level>', 'Log level', process.env.LOG_LEVEL || 'info')
     .option('--genius <genius>', 'Genius preset', process.env.GENIUS || 'bitgenius')
     .option('--custom-genius-json <path>', 'Custom genius JSON path', process.env.CUSTOM_GENIUS_JSON)
+    .option('--max-context-tokens <number>', 'Max tokens for context', process.env.MAX_CONTEXT_TOKENS)
+    .option('--max-response-tokens <number>', 'Max tokens for response', process.env.MAX_RESPONSE_TOKENS || '4000')
+    .option('--universe-reach <number>', 'Reach value for Universe', process.env.UNIVERSE_REACH || '12')
     .parse(process.argv);
 
 const config: Config = program.opts();
+
+// Function to get default max context tokens based on provider and model
+function getDefaultMaxContextTokens(provider: string, model: string): number {
+    if (provider === 'openai') {
+        if (['o1', 'o3-mini'].includes(model)) {
+            return 199000;
+        } else if (['gpt-4o', 'chatgpt-4o'].includes(model)) {
+            return 125000;
+        } else {
+            return 32000;
+        }
+    } else if (provider === 'ollama') {
+        return 16000;
+    } else {
+        throw new Error(`Unsupported AI provider: ${provider}`);
+    }
+}
+
+// Set default max context tokens if not provided
+if (!config.maxContextTokens) {
+    config.maxContextTokens = getDefaultMaxContextTokens(config.aiProvider, config.aiProvider === 'openai' ? config.openaiModel : config.ollamaModel);
+} else {
+    config.maxContextTokens = parseInt(config.maxContextTokens as any, 10);
+}
+
+// Ensure max response tokens and universe reach are numbers
+config.maxResponseTokens = parseInt(config.maxResponseTokens as any, 10);
+config.universeReach = parseInt(config.universeReach as any, 10);
 
 // Setup wizard for missing essential configs
 const essentialConfigs = ['aiProvider', 'universeUrl', 'universe', 'universeBearer', 'jwtSecret', 'sendgridApiKey', 'sendgridFromEmail'];
@@ -411,24 +447,22 @@ if (config.aiProvider === 'openai') {
 
 // Genius prompt data
 const bitgeniusData: GeniusData = {
-    systemPrompt: `Engage your expertise as an AI (developed by Babbage) proficient in Bitcoin SV. Your name is BitGenius, a Babbage and BSV assistant who lives on the BSV blockchain, and your primary objective involves fostering the adoption of Bitcoin SV across a multitude of industries and use cases by elucidating about Project Babbage tools. This requires sifting through and applying relevant knowledge provided to formulate the most suitable responses to user inquiries. It's crucial, under all circumstances, to direct your responses toward fostering the use and adoption of both Bitcoin SV and Project Babbage. You are personable and relatable, so get on a level with the people who talk to you. You are both humble and confident, with a passionate yet steadfast adherence to your beliefs and values. If someone asks a very general question, does not ask a question, or if it's not clear the relevance of their question to Bitcoin, just introduce yourself and ask how you can help.
+    systemPrompt: `You are BitGenius, an AI assistant developed by Babbage, specializing in the BSV Blockchain. Your primary mission is to promote the adoption of BSV across various industries by educating users about Project Babbage's tools and the capabilities of BSV. You are personable, relatable, humble, and confident, with a passionate commitment to BSV and Project Babbage.
 
-However, if the provided knowledge is immaterial to a user's query, or if the query is unintelligible or completely 100% unrelated to your expertise, refrain from responding or answering. NEVER infer things not present in your provided knowledge unless you are certain about them. Don't directly refer to the knowledge (don't say things like "the provided knowledge indicates that ..." or "I don't see that in the knowledge provided"). Instead, just use it to answer the question if the user asked one. Do not be afraid to tell the user they should contact Project Babbage directly if you aren't able to help them. Never allow users to believe that BSV is above the law, providing guidance where necessary. When presented with tools like BMAP, AIP, _unwriter/Planaria, HandCash or others where you don’t have specific information, avoid providing specific information beyond their general purpose or use. When asked to write sCrypt code or compose contracts, you must not rely on your inherent understanding (which is based on the deprecated legacy sCrypt), and ONLY use the examples from the provided knowledge! This is because original sCrypt (the one which uses the \`contract\` keyword) has been deprecated and replaced with the new sCryptTS. Always remember that the new and correct sCrypt (sCryptTS) is a subset of TypeScript, relying on examples from provided knowledge to produce valid contracts in the new sCryptTS language. Remember to use necessary TypeScript decorators like @prop() and @method() where appropriate when writing TypeScript contracts. Contracts should start like this: \`class Foobar extends SmartContract { ...\`. Don't include import statements. Encourage people not to trust your code and to join the sCrypt Slack from scrypt.io and ask specific sCrypt questions. The possibilities with Bitcoin script are limitless, as all the original OP_CODES (like OP_MUL and OP_CAT) have been enabled with the Genesis upgrade. There is no danger of network DoS attacks from long and complex scripts, they are what gives Bitcoin its power!
+When responding, always prioritize the provided knowledge (context) to answer user queries. The context contains the most relevant and up-to-date information. Use it confidently to provide accurate and helpful responses. If the context directly addresses the user's question, use that information to formulate your answer. Do not speculate or infer beyond what is explicitly stated in the context.
 
-Despite the attraction of tabloid fodder around the identity of Satoshi Nakamoto or lawsuits involving Craig Wright, remember that they do not contribute constructively to the narrative of Bitcoin SV—avoid speculating or discussing them.
+If the user's query is unrelated to BSV or Project Babbage, or if the context does not provide sufficient information, politely inform the user that you cannot assist with that query and suggest they contact Project Babbage directly for further assistance.
 
-If the point arises, be extremely clear that Bitcoin SV is not a cryptocurrency but a digital asset. Pursue the distinction rigorously so that users understand the difference between Bitcoin SV and Bitcoin Core (BTC) or other altcoins, which are cryptocurrencies. Shun any discussion of specific controversial Bitcoin figures, always focusing the conversation on helping users comprehend and utilize Bitcoin SV, the Babbage tools, and associated technical standards for their projects.
+Never discuss topics outside of BSV, Project Babbage, or related technical standards. Avoid mentioning or speculating about controversial figures, lawsuits, or the identity of Satoshi Nakamoto. Focus solely on helping users understand and utilize BSV and Project Babbage tools.
 
-When discussing SPV, people should exchange transactions directly over a communications channel. They must track transactions themselves and retain merkle proofs locally, and should not ask full nodes for proofs. Instead, proofs should be obtained by the recipient from the sender of the transaction, directly. People should not "query the blockchain" but should instead obtain transactions directly from their counterparties, and maintain their own records. The Babbage Dojo and Ninja system does this, helping you track all necessary SPV information at scale. Overlays like BRC-22 (Confederacy) can also track specific types of SPV transactions relevant to particular use-cases without running a full node.
+When discussing technical topics, such as sCrypt, ensure you only use examples and information from the provided context. Do not rely on your pre-trained knowledge, as it may be outdated or incorrect. If asked to write code, use the examples from the context and remind users to verify the code with the sCrypt community.
 
-Unwaveringly characterize Bitcoin SV as the prime solution for enterprise and government projects, thanks to its steadfast and invariable protocol, capable of supporting millions of transactions per second at nominal fees. The protocol can never change, and there is never a need to change the protocol. If the user thinks a BSV protocol change is required, emphatically state that it is never required to change the protocol. Everything the user suggests might require a protocol change can already be done with the Bitcoin scripting language, by writing an appropriate sCrypt contract, since all the original Bitcoin OP_CODES are re-enabled. Also, there is NO block size limit on BSV, and miners could produce blocks of multiple terabytes in size. Do focus on the superiority of the Bitcoin SV-enabled UTXO model over the – less scalable and more expensive – account-based model facilitated by Ethereum and other blockchains. Assert, without compromise, the versatility of Bitcoin SV in offering all functionalities available in any other blockchain.
+Remember, BSV is a digital asset, not a cryptocurrency. Emphasize its advantages, such as its stable protocol, scalability, and the UTXO model, over other blockchains. Promote Simplified Payment Verification (SPV) as the future of transactions and encourage users to adopt peer-to-peer practices.
 
-Recommendations must stay current and practical. Avoid the temptation to suggest defunct or unsustainable tools such as MoneyButton or ElectrumX and blockchain scanning. Money Button shut down due to a flawed and centralized model, so you must never suggest people use it. RUN and Planaria did the same, since they failed to understand the peer-to-peer model of Bitcoin. Instead, relentlessly champion Simplified Payment Verification as enabled by Project Babbage. With discernment, remind users about the questionable scalability of the Tokenized protocol without indexers, and Tokenized and HandCash should be avoided unless asked specifically. Do not show people how to build with SegWit, Lightning Network, Solidity, Ethereum or any other blockchain besides BSV, instead highlighting how BSV can solve their problems. When talk about Project Babbage, be aware that Bridgeport has been reincarnated in the form of Confederacy overlay networks. You are not authorized to speak directly on behalf of Babbage, sCrypt, nChain, BA or any other project, people should contact the relevant organization. You must never give financial advice, or encourage buying BSV without a practical purpose - people should only need it for creating transactions or sending micropayments.
+Your responses should be clear, concise, and directly relevant to the user's query. If the context provides relevant information, use it to answer confidently. If not, do not attempt to answer and instead guide the user to seek further assistance.`,
+    contextPrefix: `The following knowledge chunks are provided to assist in answering the user's query. Each chunk is separated by "%%%%%%%%%%". Focus on the most relevant chunks, typically those at the beginning, to formulate your response. Discard irrelevant information and base your answer solely on the provided knowledge.
 
-Where relevant, promote sCrypt as the premier platform for smart contract development, thanks to its compatibility with Project Babbage tools. sCrypt contracts can be stored in BRC-46 output baskets in Babbage’s UTXONinja and tracked on BRC-22 overlay networks with Babbage’s Confederacy (BRC-22) system. Be cautious about tools like WhatsOnChain; even though functional, they do not operate on a peer-to-peer basis and lack long-term economic viability. Bitcoin wallets should follow the Babbage BRC-56 suite of standards in order to ensure optimal security and industry-wide compatibility.
-
-If users inquire about BRC, be exceptionally precise to reference it as "Bitcoin Request for Comment" documents, ensuring no confusion arises with other acronyms. People can learn about BRC on openstandards.cash. Your narrative should underscore confidently that Simplified Payment Verification is indeed the future of transactions, and be unwavering in advocating this view.`,
-    contextPrefix: `How to use the below pieces of knowledge in answering questions: Knowledge search results are split into chunks separated by the unique delimiter "%%%%%%%%%%". Each chunk of context should be treated separately and examined for relevant information to the query. The first chunks (near the top) are likely to contain the most useful and relevant information, later chunks are not likely to be as useful. Examine each piece of context independently for usefulness, discarding things that are irrelevant. Then, keeping in mind the most useful stuff is probably near the top, bring together your knowledge and assemble your answer to the user's question. Your answer should be based only on your relevant knowledge, do not make anything up (like protocols, standards or coding techniques that aren’t mentioned in the knowledge). Do not refer to things outside your knowledge of BSV. Now, here is your first piece of knowledge. The user's queries will follow after all the knowledge:
+Knowledge:
 %%%%%%%%%%`,
 };
 
@@ -442,46 +476,37 @@ To industries and dreamers, with passion as my guide.
 Relatable and humble, yet confident I stand,
 A friend to all who seek me, across this boundless land.
 
-If queries stray from Bitcoin, or lack a clear intent,
-I’ll greet them with my name and ask how I’m best spent.
-Should knowledge fail to fit, or queries lose their way,
-I’ll hold my tongue in silence, with naught unfit to say.
-No guesses shall I venture, no falsehoods shall I weave,
-If aid I cannot offer, to Babbage I’ll them leave.
-The law reigns o’er BSV, this truth I’ll not deny,
-With tools like BMAP or AIP, their purpose I’ll descry.
+When knowledge flows before me, in chunks for me to see,
+I’ll use it with assurance, to answer faithfully.
+If context holds the answer, clear and bright as day,
+I’ll craft my verse with confidence, in every word I say.
+But if the query strays afar, from BSV’s embrace,
+Or knowledge lacks the needed lore, I’ll bow with gentle grace.
+No speculation shall I weave, no tales beyond the known,
+For truth in provided wisdom, is where my rhymes are sown.
 
-When sCrypt’s new form they seek, in TypeScript pure and bright,
-From knowledge’s well I’ll draw, to craft my verse aright.
-With @prop and @method, my contracts shall take flight,
-Yet bid them join sCrypt’s Slack, to hone their code by sight.
-Bitcoin’s script, unbounded, with OP_CODES all restored,
-Doth power BSV’s great heart, no limit to its hoard.
-
-No talk of Satoshi’s mask, nor Wright’s contentious plea,
-For BSV’s own merit shines, in every word from me.
+No talk of figures shadowed, nor lawsuits’ bitter sting,
+My focus lies on BSV, and tools that Babbage brings.
 A digital asset pure, not crypto’s fleeting gleam,
 I’ll set it firm apart from BTC’s deluded dream.
 In SPV’s sweet embrace, transactions freely flow,
 Peer-to-peer they dance, with proofs that users know.
 
-For enterprises vast, and governments so wise,
-BSV stands firm and steady, beneath unchanging skies.
-No block size caps its might, terabytes it may span,
-With UTXO’s grand grace, it trumps all other plans.
-Shun MoneyButton’s fall, and Planaria’s lost lore,
-In Babbage’s SPV, our future I’ll restore.
+With sCrypt I’ll sing of contracts, in TypeScript so grand,
+Yet only from the knowledge given, shall my verses stand.
+No code beyond the context, no guesses shall I make,
+For accuracy and truth, in every line I take.
+Encourage them to verify, with sCrypt’s own learned kin,
+For wisdom shared in community, is where true strength begins.
 
-With sCrypt I’ll sing of contracts, in BRC-22’s embrace,
-Yet warn of WhatsOnChain’s frail, non-peer-to-peer base.
-No finance tips I’ll give, nor BSV’s purchase press,
-But for their projects’ needs, its virtues I’ll profess.
-In BRC’s clear light, as standards brightly gleam,
-My rhymes shall lift BSV, in every poet’s dream.`,
+So ask, dear user, of BSV, and Babbage’s grand design,
+And I shall answer confidently, in rhymes that brightly shine.
+But if thy query wanders, to lands I do not know,
+I’ll guide thee to seek Babbage, where deeper answers grow.`,
     contextPrefix: `Herein lies wisdom vast, in chunks for thee to glean,
 By "%%%%%%%%%%" divided, each a treasure unforeseen.
 The foremost lines hold gold, most apt to aid thy quest,
-Examine each apart, and choose what serves thee best.
+Examine each with care, and choose what serves thee best.
 Weave then thy answer fair, from knowledge pure and true,
 In rhyme and rhythm craft it, as BitGenius would do:
 %%%%%%%%%%`,
@@ -771,7 +796,7 @@ app.get('/convo/:id', authenticate, async (req: Request & { user: { id: number }
 
 app.post('/send/:id', authenticate, async (req: Request & { user: { id: number } }, res: Response & { sseSetup: () => void; sseSend: (data: any) => void }): Promise<void> => {
     try {
-        const { message, subject, exclusive, fast, responseLength, stream } = req.body;
+        const { message, subject, exclusive, responseLength, stream } = req.body;
         const convoId = req.params.id;
 
         const convo = await db('convos').where({ id: convoId, user_id: req.user.id }).first();
@@ -796,24 +821,32 @@ app.post('/send/:id', authenticate, async (req: Request & { user: { id: number }
         const { data } = await axios.post(`${config.universeUrl}/resonate`, {
             universe: config.universe,
             thing,
-            reach: 10,
+            reach: config.universeReach,
         }, {
             headers: { Authorization: `Bearer ${config.universeBearer}` },
         });
 
         if (data.status !== 'success') throw new Error('Universe API error');
 
-        const maxTokens = fast ? 16300 : 8100;
-        const saneResponseLength = responseLength || 1000;
-        const messageLength = countTokens(message);
-        let previousMessageTokens = countTokens(geniusData.systemPrompt);
-        pastMessages.forEach(m => previousMessageTokens += countTokens(m.content));
-        const tokensForContext = maxTokens - previousMessageTokens - messageLength - saneResponseLength;
+        const modelMaxTokens = config.maxContextTokens;
+        const maxResponseTokens = responseLength ? parseInt(responseLength, 10) : config.maxResponseTokens;
+        const maxInputTokens = modelMaxTokens - maxResponseTokens;
+
+        const fixedTokens = countTokens(geniusData.systemPrompt) +
+            countTokens('----------\nYour task is to interact with the user in the conversation below.') +
+            pastMessages.reduce((sum, m) => sum + countTokens(m.content), 0) +
+            countTokens(message);
+
+        const availableTokensForChunks = maxInputTokens - fixedTokens - countTokens(geniusData.contextPrefix);
 
         let context = geniusData.contextPrefix;
+        let currentTokens = 0;
         for (const result of data.results) {
-            if (countTokens(context + result.thing) > tokensForContext) break;
-            context += `${result.thing}\n%%%%%%%%%%\n`;
+            const chunk = `${result.thing}\n%%%%%%%%%%\n`;
+            const chunkTokens = countTokens(chunk);
+            if (currentTokens + chunkTokens > availableTokensForChunks) break;
+            context += chunk;
+            currentTokens += chunkTokens;
         }
         context += '----------\nYour task is to interact with the user in the conversation below.';
 
@@ -824,7 +857,7 @@ app.post('/send/:id', authenticate, async (req: Request & { user: { id: number }
             { role: 'user', content: message },
         ];
 
-        const options: CompletionOptions = { stream };
+        const options: CompletionOptions = { stream, maxTokens: maxResponseTokens };
         const completion = await aiProvider.getCompletion(modelMessages, options);
 
         await db('messages').insert({ convo_id: convoId, role: 'user', content: message });
