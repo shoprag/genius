@@ -21,6 +21,7 @@ import validator from 'validator';
 import xss from 'xss';
 import tiktoken from 'tiktoken-node';
 import sgMail from '@sendgrid/mail';
+import UI from './UI.mjs'
 
 // Load environment variables initially
 dotenv.config();
@@ -620,6 +621,15 @@ async function loginUser(email: string, password: string): Promise<string> {
 
 // Express setup
 const app = express();
+
+// Serve the UI
+app.get('/', (_, res: Response) => {
+    res.status(200).set({
+        'Content-Type': 'text/html'
+    }).send(UI());
+});
+
+// Body parser and rate limiter
 app.use(bodyParser.json({ limit: '1mb' }));
 app.use(rateLimit({
     windowMs: 10 * 60 * 1000,
