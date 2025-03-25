@@ -27,9 +27,6 @@ import UI from './UI.mjs'
 // Load environment variables initially
 dotenv.config();
 
-// Create a fake migrations directory to stop Knex from causing issues.
-fs.mkdirSync(path.join(process.cwd(), 'migrations'))
-
 /**
  * Interface for Genius configuration
  */
@@ -350,8 +347,6 @@ const db = knex(knexConfig);
  */
 async function runMigrations() {
     await db.migrate.latest({
-        directory: path.join(process.cwd(), 'migrations'),
-        loadExtensions: ['.ts'],
         migrationSource: {
             async getMigrations() {
                 return [
