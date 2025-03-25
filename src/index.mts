@@ -131,6 +131,12 @@ class OpenAIProvider implements AIProvider {
         };
         if (completionOptions.model.startsWith('o')) {
             completionOptions.max_completion_tokens = options.maxTokens
+            completionOptions.messages = messages.map(x => {
+                if (x.role === 'system') {
+                    return { ...x, role: 'developer', content: `formatting re-enabled\n${x.content}` }
+                }
+                return x
+            })
         } else {
             completionOptions.max_tokens = options.maxTokens
         }
