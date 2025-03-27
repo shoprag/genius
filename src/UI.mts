@@ -740,19 +740,29 @@ export default () => `
                     button.textContent = buttonConfig.text;
                     button.classList.add(buttonConfig.type === 'danger' ? 'danger' : (buttonConfig.type === 'secondary' ? 'secondary' : 'primary'));
                     button.onclick = () => {
-                         const result = { confirmed: buttonConfig.value !== false }; // Usually true unless explicitly 'Cancel' (value: false)
+                         // Base result on button's value (true unless explicitly false)
+                         const result = { confirmed: buttonConfig.value !== false };
+
+                         // Determine the primary return 'value'
                          if (input) {
-                             result.value = modalInput.value; // Include input value if present
+                             // If modal was configured WITH an input object, 'value' is the input's content
+                             result.value = modalInput.value;
+                         } else {
+                             // If modal was configured WITHOUT an input object, 'value' is the button's configured value
+                             result.value = buttonConfig.value;
                          }
+                         // Re-ensure 'confirmed' is correct based on the button pressed, regardless of 'value' source
+                         result.confirmed = buttonConfig.value !== false;
+                         // --- MODAL FIX END ---
+
 
                          // Resolve the promise FIRST
                          if (currentModalResolver) {
-                            currentModalResolver(result);
+                            currentModalResolver(result); // Resolve with the potentially modified result
                             currentModalResolver = null; // Clear resolver *before* calling closeModal
                          }
                          // THEN close the modal visually
                          closeModal();
-                         // --- MODAL FIX END ---
                     };
                     modalActions.appendChild(button);
                 });
@@ -764,15 +774,13 @@ export default () => `
         function closeModal() {
             modalOverlay.classList.remove('open'); // Visually hide the modal
 
-            // --- MODAL FIX START ---
-            // If the modal is closed unexpectedly (e.g., overlay click)
+            // If the modal is closed unexpectedly (e.g., overlay click, ESC key)
             // and a resolver still exists, resolve it as 'cancelled'.
             if (currentModalResolver) {
                  console.log("Modal closed unexpectedly, resolving as cancelled."); // Optional: for debugging
-                 currentModalResolver({ confirmed: false }); // Resolve with cancelled state
+                 currentModalResolver({ confirmed: false, value: undefined }); // Resolve with cancelled state
                  currentModalResolver = null;
             }
-            // --- MODAL FIX END ---
         }
 
          // Close modal if clicking overlay
@@ -795,11 +803,11 @@ export default () => `
         }
 
         async function showConfirm(title, message) {
-            const { confirmed } = await showModal({
+            const { confirmed } = await showModal({ // \`value\` will be true or false here
                 title, message,
                 buttons: [
                     { text: 'Cancel', type: 'secondary', value: false },
-                    { text: 'Confirm', type: 'primary' } // Default confirmed: true
+                    { text: 'Confirm', type: 'primary', value: true } // Explicit true for confirm
                 ]
             });
             return confirmed;
@@ -808,12 +816,12 @@ export default () => `
         async function showPrompt(title, message, inputOptions = {}) {
              // Ensure inputOptions is an object
              const inputConf = typeof inputOptions === 'object' && inputOptions !== null ? inputOptions : {};
-            const { confirmed, value } = await showModal({
+            const { confirmed, value } = await showModal({ // \`value\` will be the input text here
                 title, message,
                 input: { value: inputConf.value || '', placeholder: inputConf.placeholder || '' },
                 buttons: [
                     { text: 'Cancel', type: 'secondary', value: false },
-                    { text: 'OK', type: 'primary' }
+                    { text: 'OK', type: 'primary', value: true } // \`value: true\` here is just for confirmed status
                 ]
             });
             return confirmed ? value : null; // Return input value if confirmed, else null
@@ -1878,6 +1886,8 @@ export default () => `
                    }
 
                   // Show modal with link and copy button
+                  // Note: This modal call does NOT pass the \`input\` parameter, so the fix in showModal
+                  // will correctly assign the button's 'value' ('copy', 'revoke', false) to modalResult.value
                   const modalResult = await showModal({
                        title: 'Share Conversation',
                        message: \`Anyone with this link can view a snapshot of this conversation (up to the time of sharing).<br><br><input type="text" class="modal-input" value="\${shareLink}" readonly onclick="this.select()">\`,
@@ -1888,14 +1898,15 @@ export default () => `
                        ]
                    });
 
-                   if (modalResult.confirmed && modalResult.value === 'copy') { // Check specific value
+                   // Check the 'value' returned by the modal promise (will be 'copy', 'revoke', or false)
+                   if (modalResult.confirmed && modalResult.value === 'copy') {
                        navigator.clipboard.writeText(shareLink).then(() => {
                            showAlert('Copied!', 'Share link copied to clipboard.');
                        }).catch(err => {
                            console.error("Copy failed:", err);
                            showAlert('Copy Failed', 'Could not copy link. You can copy it manually.');
                        });
-                   } else if (modalResult.confirmed && modalResult.value === 'revoke') { // Check specific value
+                   } else if (modalResult.confirmed && modalResult.value === 'revoke') {
                         handleRevokeShare();
                    }
                    // 'Close' or clicking outside resolves { confirmed: false } and does nothing here
