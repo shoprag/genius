@@ -1,6 +1,6 @@
 {
     "name": "@shoprag/genius",
-    "version": "1.0.17",
+    "version": "1.0.18",
     "description": "Chatbot factory",
     "main": "dist/index.mjs",
     "types": "dist/index.d.mts",
