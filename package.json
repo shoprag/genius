@@ -33,6 +33,7 @@
         "openai": "^4.89.0",
         "sqlite3": "^5.1.7",
         "tiktoken-node": "^0.0.7",
+        "uuid": "^11.1.0",
         "validator": "^13.15.0",
         "winston": "^3.17.0",
         "xss": "^1.0.15",
