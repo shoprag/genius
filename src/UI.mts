@@ -715,52 +715,72 @@ export default () => `
         let currentModalResolver = null;
 
         function showModal({ title, message, input = null, buttons = [{ text: 'OK', type: 'primary' }] }) {
-            modalTitle.textContent = title;
-            modalMessage.innerHTML = message; // Use innerHTML to allow basic formatting
-
-            modalInput.style.display = input ? 'block' : 'none';
-            modalInput.value = input?.value || '';
-            modalInput.placeholder = input?.placeholder || '';
-            if (input) setTimeout(() => modalInput.focus(), 100); // Focus input after modal animation
-
-            modalActions.innerHTML = ''; // Clear previous buttons
-
             return new Promise((resolve) => {
-                currentModalResolver = resolve;
+                currentModalResolver = resolve; // Store the resolver
+
+                modalTitle.textContent = title;
+                modalMessage.innerHTML = message; // Use innerHTML to allow basic formatting
+
+                modalInput.style.display = input ? 'block' : 'none';
+                modalInput.value = input?.value || '';
+                modalInput.placeholder = input?.placeholder || '';
+                if (input) setTimeout(() => modalInput.focus(), 100); // Focus input after modal animation
+
+                modalActions.innerHTML = ''; // Clear previous buttons
+
                 buttons.forEach(buttonConfig => {
                     const button = document.createElement('button');
                     button.textContent = buttonConfig.text;
-                    button.classList.add(buttonConfig.type === 'danger' ? 'danger' : (buttonConfig.type === 'secondary' ? 'secondary' : 'primary')); // Assuming 'primary' is default accent
+                    button.classList.add(buttonConfig.type === 'danger' ? 'danger' : (buttonConfig.type === 'secondary' ? 'secondary' : 'primary'));
                     button.onclick = () => {
                          const result = { confirmed: buttonConfig.value !== false }; // Usually true unless explicitly 'Cancel' (value: false)
                          if (input) {
                              result.value = modalInput.value; // Include input value if present
                          }
-                        closeModal();
-                        resolve(result);
-                        currentModalResolver = null;
+
+                         // Resolve the promise FIRST
+                         if (currentModalResolver) {
+                            currentModalResolver(result);
+                            currentModalResolver = null; // Clear resolver *before* calling closeModal
+                         }
+                         // THEN close the modal visually
+                         closeModal();
+                         // --- MODAL FIX END ---
                     };
                     modalActions.appendChild(button);
                 });
 
-                modalOverlay.classList.add('open');
+                modalOverlay.classList.add('open'); // Make the modal visible
             });
         }
 
         function closeModal() {
-            modalOverlay.classList.remove('open');
-             // If modal closed unexpectedly (e.g., clicking outside), resolve with default (cancel)
-             if(currentModalResolver) {
-                 currentModalResolver({ confirmed: false });
+            modalOverlay.classList.remove('open'); // Visually hide the modal
+
+            // --- MODAL FIX START ---
+            // If the modal is closed unexpectedly (e.g., overlay click)
+            // and a resolver still exists, resolve it as 'cancelled'.
+            if (currentModalResolver) {
+                 console.log("Modal closed unexpectedly, resolving as cancelled."); // Optional: for debugging
+                 currentModalResolver({ confirmed: false }); // Resolve with cancelled state
                  currentModalResolver = null;
-             }
+            }
+            // --- MODAL FIX END ---
         }
+
          // Close modal if clicking overlay
         modalOverlay.addEventListener('click', (e) => {
             if (e.target === modalOverlay) {
+                closeModal(); // This will now correctly trigger the 'cancelled' resolution if needed
+            }
+        });
+        // Optional: Add ESC key listener to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modalOverlay.classList.contains('open')) {
                 closeModal();
             }
         });
+
 
         // Helper functions using the modal system
         async function showAlert(title, message) {
@@ -1051,14 +1071,7 @@ export default () => `
              showTypingIndicator();
              setSendingState(true); // Set sending state immediately
 
-             const url = \`/send/\${convoId}\`;
-             console.log("Establishing SSE connection to:", url);
-             sseSource = new EventSource(url, { withCredentials: false }); // Typically no credentials needed for SSE with JWT header
-
-             // Need to *send* the message content and JWT via POST, then handle SSE response.
-             // The EventSource API itself doesn't support POST bodies or custom headers easily.
-             // *** REVISED APPROACH: Use fetch for POST, then handle stream ***
-             closeSseConnection(); // Close EventSource, it's not the right tool here.
+             // Use fetch with stream instead of EventSource
              streamFetchResponse(convoId, userMessageContent);
          }
 
@@ -1411,7 +1424,7 @@ export default () => `
                  editButton.innerHTML = '<i class="fas fa-pencil-alt"></i>';
                  editButton.title = 'Rename Conversation';
                  editButton.onclick = async (e) => {
-                      e.stopPropagation();
+                      e.stopPropagation(); // Prevent convo selection
                       handleRenameConversation(convo.id, convo.title);
                  };
                  actionsDiv.appendChild(editButton);
@@ -1423,7 +1436,7 @@ export default () => `
                  deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
                  deleteButton.title = 'Delete Conversation';
                  deleteButton.onclick = async (e) => {
-                      e.stopPropagation();
+                      e.stopPropagation(); // Prevent convo selection
                       handleDeleteConversation(convo.id, convo.title);
                  };
                  actionsDiv.appendChild(deleteButton);
@@ -1506,7 +1519,7 @@ export default () => `
 
               const trimmedTitle = newTitle.trim();
 
-               // Optimistic UI update (optional)
+               // Optimistic UI update (optional, can make UI feel faster)
                // const itemSpan = $(\`.convo-item[data-id="\${convoId}"] span\`);
                // if (itemSpan) itemSpan.textContent = trimmedTitle + ' (saving...)';
 
@@ -1540,7 +1553,7 @@ export default () => `
 
               } catch (err) {
                    console.error('Rename convo error:', err);
-                    // Revert optimistic update if done
+                    // Revert optimistic update if it was used
                     // if (itemSpan) itemSpan.textContent = currentTitle;
                    if (err.message === 'Unauthorized') triggerLogout(true);
                    else await showAlert('Error', err.message || 'An error occurred while renaming.');
@@ -1582,7 +1595,7 @@ export default () => `
                 }
             } catch (err) {
                 console.error('Delete convo error:', err);
-                 if (itemDiv) itemDiv.style.opacity = '1'; // Revert visual indication
+                 if (itemDiv) itemDiv.style.opacity = '1'; // Revert visual indication on error
                 if (err.message === 'Unauthorized') triggerLogout(true);
                 else await showAlert('Error', err.message || 'An error occurred while deleting.');
             }
@@ -1843,26 +1856,27 @@ export default () => `
                    }
 
                   // Show modal with link and copy button
-                  await showModal({
+                  const modalResult = await showModal({
                        title: 'Share Conversation',
                        message: \`Anyone with this link can view a snapshot of this conversation (up to the time of sharing).<br><br><input type="text" class="modal-input" value="\${shareLink}" readonly onclick="this.select()">\`,
                        buttons: [
-                           { text: 'Copy Link', type: 'primary' },
-                           { text: 'Revoke Share', type: 'danger', value: 'revoke' }, // Special value for revoke
+                           { text: 'Copy Link', type: 'primary', value: 'copy' }, // Use value to differentiate actions
+                           { text: 'Revoke Share', type: 'danger', value: 'revoke' },
                            { text: 'Close', type: 'secondary', value: false }
                        ]
-                   }).then(result => {
-                       if (result.confirmed && result.value !== 'revoke') { // Copy Link clicked
-                           navigator.clipboard.writeText(shareLink).then(() => {
-                               showAlert('Copied!', 'Share link copied to clipboard.');
-                           }).catch(err => {
-                               console.error("Copy failed:", err);
-                               showAlert('Copy Failed', 'Could not copy link. You can copy it manually.');
-                           });
-                       } else if (result.value === 'revoke') { // Revoke Share clicked
-                            handleRevokeShare();
-                       }
                    });
+
+                   if (modalResult.confirmed && modalResult.value === 'copy') { // Check specific value
+                       navigator.clipboard.writeText(shareLink).then(() => {
+                           showAlert('Copied!', 'Share link copied to clipboard.');
+                       }).catch(err => {
+                           console.error("Copy failed:", err);
+                           showAlert('Copy Failed', 'Could not copy link. You can copy it manually.');
+                       });
+                   } else if (modalResult.confirmed && modalResult.value === 'revoke') { // Check specific value
+                        handleRevokeShare();
+                   }
+                   // 'Close' or clicking outside resolves { confirmed: false } and does nothing here
 
              } catch (err) {
                  console.error("Share error:", err);
@@ -1876,8 +1890,9 @@ export default () => `
 
          async function handleRevokeShare() {
              if (!state.selectedConvoId) return;
-             const confirmed = await showConfirm('Revoke Share?', 'Are you sure? This will invalidate the current share link.');
-             if (!confirmed) return;
+             // Confirmation is now done inside handleShareConversation flow or can be added here if called directly
+             // const confirmed = await showConfirm('Revoke Share?', 'Are you sure? This will invalidate the current share link.');
+             // if (!confirmed) return;
 
              try {
                  const response = await fetch(\`/convo/\${state.selectedConvoId}/share\`, {
@@ -1979,7 +1994,6 @@ export default () => `
                 button.disabled = false;
                 button.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
             }
-            // No finally needed, button state handled
         });
 
         $('#register-form')?.addEventListener('submit', async (e) => {
@@ -2053,10 +2067,12 @@ export default () => `
                   showAlert("Missing Email", "Please ensure the email field contains your email address.");
                   return;
               }
-              const button = e.target;
+              const button = e.target.closest('button'); // Ensure we target the button itself
+              if (!button) return;
+
               button.disabled = true;
+              let originalHtml = button.innerHTML; // Store original HTML
               button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resending...';
-              let originalText = '<i class="fas fa-redo"></i> Resend Code';
 
              try {
                  const response = await fetch('/resend-verification', {
@@ -2069,15 +2085,14 @@ export default () => `
                  await showAlert('Code Sent', 'Verification code resent. Please check your email.');
                   // Add cooldown visual state
                   button.innerHTML = '<i class="fas fa-clock"></i> Wait...';
-                  setTimeout(() => { button.disabled = false; button.innerHTML = originalText; }, 45000); // 45s cooldown
+                  setTimeout(() => { button.disabled = false; button.innerHTML = originalHtml; }, 45000); // 45s cooldown
 
              } catch (err) {
                  console.error('Resend code error:', err);
                  await showAlert('Error', err.message || 'An error occurred while resending the code.');
                   button.disabled = false; // Re-enable immediately on error
-                 button.innerHTML = originalText;
+                 button.innerHTML = originalHtml;
              }
-             // No finally needed, specific cooldown logic
          });
 
          $('#forgot-password-form')?.addEventListener('submit', async (e) => {
@@ -2159,8 +2174,8 @@ export default () => `
         $$('#to-register, #to-login, #to-forgot-password, #back-to-login-verify, #back-to-login-forgot, #back-to-login-reset').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const targetView = e.target.getAttribute('href').substring(1); // Get view name from href
-                setView(targetView);
+                const targetView = e.target.closest('a')?.getAttribute('href')?.substring(1); // Get view name from href
+                if (targetView) setView(targetView);
             });
         });
 

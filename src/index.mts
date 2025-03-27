@@ -167,7 +167,7 @@ class OpenAIProvider implements AIProvider {
         try {
             const prompt = `Based on the following user message, suggest a concise and relevant title (3-5 words) for this conversation:\n\n"${userMessage}"\n\nTitle:`;
             const completion = await this.client.chat.completions.create({
-                model: this.model, // Use the same model as configured
+                model: 'gpt-4o',
                 messages: [{ role: 'user', content: prompt }],
                 max_tokens: 15, // Short response expected
                 temperature: 0.5, // Slightly creative but focused
