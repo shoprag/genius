@@ -31,6 +31,8 @@ export default () => `
             --success-color: #28a745;
             --header-height: 65px;
             --font-family: 'Inter', sans-serif;
+            --scrollbar-color: #555;
+            --scrollbar-track-color: var(--surface-color);
         }
 
         /* General Styles */
@@ -44,28 +46,57 @@ export default () => `
             color: var(--text-color);
             margin: 0;
             padding: 0;
-            overflow-x: hidden;
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
+            height: 100vh; /* Full viewport height */
+            overflow: hidden; /* Prevent body scroll */
+        }
+        body.loading main {
+            visibility: hidden; /* Hide main content while loading */
         }
         body.logged-out .sidebar,
-        body.logged-out #menu-toggle {
+        body.logged-out #menu-toggle,
+        body.logged-out .sidebar-footer {
             display: none;
         }
+        body.logged-in #loading-overlay {
+             display: none; /* Hide loader when logged in */
+        }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: var(--bg-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000; /* Ensure it's on top */
+            transition: opacity 0.3s ease;
+        }
+        #loading-overlay i {
+            font-size: 40px;
+            color: var(--accent-color);
+        }
+        body:not(.loading) #loading-overlay {
+             opacity: 0;
+             pointer-events: none;
+        }
+
 
         header {
             background-color: var(--surface-color);
             padding: 0 20px;
             height: var(--header-height);
             display: flex;
-            flex-wrap: nowrap; /* Prevent wrapping */
+            flex-wrap: nowrap;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-            position: sticky;
+            position: sticky; /* Keeps header fixed if body allowed scrolling, but body shouldn't scroll */
             top: 0;
             z-index: 100;
+            flex-shrink: 0; /* Prevent header from shrinking */
         }
 
         #menu-toggle {
@@ -98,7 +129,8 @@ export default () => `
         main {
             display: flex;
             flex: 1; /* Takes remaining vertical space */
-            overflow: hidden; /* Prevent content overflow issues */
+            overflow: hidden; /* Critical: Prevent main from causing body scroll */
+            /* visibility added/removed by body.loading class */
         }
 
         .sidebar {
@@ -107,16 +139,20 @@ export default () => `
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
+            height: 100%; /* Fill height of main */
             transition: transform 0.3s ease, width 0.3s ease;
-            flex-shrink: 0; /* Prevent shrinking */
+            flex-shrink: 0;
+            position: relative; /* Needed for absolute positioning of footer */
+            overflow: hidden; /* Container for scrolling content */
         }
 
         .sidebar-header {
             padding: 15px;
             border-bottom: 1px solid var(--border-color);
             display: flex;
-            flex-direction: column; /* Stack title and buttons */
+            flex-direction: column;
             gap: 10px;
+            flex-shrink: 0; /* Prevent shrinking */
         }
         .sidebar-header h2 {
             margin: 0 0 5px 0;
@@ -124,26 +160,36 @@ export default () => `
         }
         .sidebar-header-actions {
             display: flex;
-            justify-content: space-between; /* Space out buttons */
+            justify-content: space-between;
             gap: 10px;
         }
 
         .sidebar-content {
-            flex: 1;
-            overflow-y: auto;
+            flex: 1; /* Takes available vertical space */
+            overflow-y: auto; /* Enable scrolling for convo list */
             padding: 15px;
+            min-height: 0; /* Allow shrinking */
         }
         /* Custom scrollbar for sidebar */
         .sidebar-content::-webkit-scrollbar { width: 8px; }
-        .sidebar-content::-webkit-scrollbar-track { background: var(--surface-color); }
-        .sidebar-content::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
-        .sidebar-content::-webkit-scrollbar-thumb:hover { background: #555; }
+        .sidebar-content::-webkit-scrollbar-track { background: var(--scrollbar-track-color); }
+        .sidebar-content::-webkit-scrollbar-thumb { background: var(--scrollbar-color); border-radius: 4px; }
+        .sidebar-content::-webkit-scrollbar-thumb:hover { background: #666; }
+
+         .sidebar-footer {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+        .sidebar-footer button {
+            width: 100%; /* Make button full width */
+        }
 
         #close-sidebar {
-            display: none; /* Hidden by default, shown in media query */
+            display: none;
             width: auto;
             margin-bottom: 10px;
-            align-self: flex-end; /* Position to the right */
+            align-self: flex-end;
             padding: 5px 10px;
             font-size: 18px;
         }
@@ -151,11 +197,11 @@ export default () => `
         .content {
             flex: 1; /* Takes remaining horizontal space */
             display: flex;
-            flex-direction: column;
-            align-items: center; /* Center views like login/register */
-            justify-content: center; /* Center views like login/register */
-            padding: 20px;
-            overflow-y: auto; /* Allow content itself to scroll if needed */
+            flex-direction: column; /* Stack messages container and input form */
+            /* Removed align/justify center - specific views handle this */
+            /* padding: 20px; */ /* Removed padding - apply to specific views or containers */
+            overflow: hidden; /* Prevent content overflow */
+            height: 100%; /* Fill height of main */
         }
 
         .backdrop {
@@ -177,36 +223,44 @@ export default () => `
 
         /* View Management */
         .view {
-            display: none;
+            display: none; /* Hide inactive views */
             width: 100%;
-            max-width: 600px;
+            height: 100%; /* Views should fill the content area */
             opacity: 0;
             transition: opacity 0.4s ease;
             animation: fadeIn 0.4s ease forwards;
-            padding: 20px 0; /* Add some vertical padding */
-        }
-
-        .view-conversation {
-            max-width: 900px; /* Wider conversation view */
-            display: flex;
-            flex-direction: column;
-            height: 100%; /* Occupy full height of content area */
-            width: 100%; /* Occupy full width of content area */
-            justify-content: flex-end; /* Push content to bottom initially */
-            padding: 0; /* Remove padding from view itself */
+            padding: 20px; /* Default padding for simple views */
+            overflow: auto; /* Allow scrolling for simple views if needed */
+            max-width: 600px; /* Limit width for form views */
+            margin: 0 auto; /* Center form views */
         }
 
         .view.active {
-            display: flex; /* Use flex for centering */
+            display: flex; /* Use flex for layout */
             flex-direction: column;
-            align-items: center;
+            align-items: center; /* Center content in simple views */
             opacity: 1;
         }
+
+        /* Overrides for specific views */
+         .view-dashboard, .view-login, .view-register, .view-verify {
+             justify-content: center; /* Vertically center simple views */
+         }
+
+        .view-conversation {
+            max-width: none; /* Allow conversation to fill width */
+            padding: 0; /* Remove default padding */
+            overflow: hidden; /* Prevent conversation view itself from scrolling */
+            /* height: 100%; */ /* Ensure it takes full height (already done by .view) */
+        }
+
         .view-conversation.active {
-            display: flex; /* Override for conversation view */
+            display: flex; /* Use flex for conversation layout */
             flex-direction: column;
             align-items: stretch; /* Stretch children horizontally */
+            justify-content: flex-end; /* Push content to bottom (messages container will grow) */
         }
+
 
         /* Login/Register Specific Styles */
         .view-login h2, .view-register h2, .view-verify h2 {
@@ -235,18 +289,26 @@ export default () => `
             border-radius: 10px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
             width: 100%;
-            max-width: 400px; /* Limit form width */
+            max-width: 400px;
+            flex-shrink: 0; /* Prevent form from shrinking in flex */
         }
         #send-form { /* Override for message input form */
             flex-direction: row;
-            align-items: flex-end; /* Align button with bottom of textarea */
+            align-items: flex-end;
             padding: 15px;
-            margin: 0 20px 20px 20px; /* Add margin around the send form */
-            max-width: none; /* Allow full width */
+            margin: 0 20px 20px 20px; /* Margin around the form */
+            max-width: 900px; /* Limit width, centered */
+            width: calc(100% - 40px); /* Responsive width */
+            margin-left: auto;
+            margin-right: auto;
             gap: 10px;
             box-shadow: none;
             background: var(--surface-color);
             border-radius: 12px;
+            border: 1px solid var(--border-color);
+            flex-shrink: 0; /* Prevent shrinking */
+            position: relative; /* Keep it in flow */
+            z-index: 10; /* Above messages */
         }
 
         input, button, textarea {
@@ -270,13 +332,14 @@ export default () => `
         textarea {
             resize: none;
             line-height: 1.5;
-            overflow-y: auto; /* Show scrollbar when max-height is reached */
-            min-height: calc(1.5em * 1 + 24px); /* Start at approx 1 line + padding */
-            max-height: calc(1.5em * 12 + 24px); /* Max approx 12 lines + padding */
-            height: auto; /* Initial auto height */
+            overflow-y: auto;
+            min-height: calc(1.5em * 1 + 24px);
+            max-height: calc(1.5em * 12 + 24px);
+            height: calc(1.5em * 1 + 24px);;
+            width: 100%;
         }
         textarea:disabled {
-            background-color: #2d2d2d; /* Slightly different bg when disabled */
+            background-color: #2d2d2d;
             opacity: 0.7;
             cursor: not-allowed;
         }
@@ -288,11 +351,12 @@ export default () => `
             transition: background-color 0.2s ease, transform 0.1s ease;
             user-select: none;
             font-weight: 500;
-            border: none; /* Remove border for buttons */
-            display: inline-flex; /* Align icon and text */
+            border: none;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px; /* Space between icon and text */
+            gap: 8px;
+            flex-shrink: 0; /* Prevent button shrinking */
         }
 
         button:hover:not(:disabled) {
@@ -310,16 +374,18 @@ export default () => `
         }
 
         button#logout,
+        button#sidebar-logout,
         .convo-item button {
             background-color: var(--danger-color);
         }
         button#logout:hover:not(:disabled),
+        button#sidebar-logout:hover:not(:disabled),
         .convo-item button:hover:not(:disabled) {
             background-color: var(--danger-hover);
         }
 
         button#create-convo {
-            flex-grow: 1; /* Allow New Convo button to take more space if needed */
+            flex-grow: 1;
         }
 
         button#clear-all {
@@ -333,6 +399,7 @@ export default () => `
             border-color: var(--danger-color);
         }
 
+        /* Copy Buttons (General and Code Block Specific) */
         .copy-btn {
             background: var(--surface-hover);
             color: var(--text-muted);
@@ -342,8 +409,10 @@ export default () => `
             border-radius: 5px;
             opacity: 0.7;
             transition: opacity 0.2s ease, background-color 0.2s ease;
+            cursor: pointer;
         }
-        .message-header:hover .copy-btn {
+        .message-header:hover .copy-btn,
+        .code-block-wrapper:hover .copy-btn { /* Show on hover of wrapper */
             opacity: 1;
         }
         .copy-btn:hover {
@@ -354,6 +423,23 @@ export default () => `
             background: var(--success-color);
             color: white;
         }
+
+        .code-block-wrapper {
+            position: relative;
+            margin: 10px 0;
+        }
+        .code-block-wrapper .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 1;
+            opacity: 0; /* Initially hidden */
+        }
+        .code-block-wrapper pre {
+             margin: 0; /* Remove margin from pre inside wrapper */
+             position: relative; /* Needed for z-index stacking context if any */
+        }
+
 
         a {
             color: var(--accent-color);
@@ -370,7 +456,7 @@ export default () => `
             justify-content: space-between;
             align-items: center;
             padding: 10px 12px;
-            background: transparent; /* Use transparent bg */
+            background: transparent;
             border-radius: 6px;
             margin-bottom: 5px;
             cursor: pointer;
@@ -393,7 +479,7 @@ export default () => `
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            margin-right: 10px; /* Space before delete button */
+            margin-right: 10px;
             font-size: 15px;
         }
 
@@ -411,8 +497,8 @@ export default () => `
         }
         .convo-item button:hover {
             color: var(--danger-color);
-            background: transparent; /* Keep transparent */
-            transform: none; /* No move on hover */
+            background: transparent;
+            transform: none;
         }
         .convo-item.selected button {
             color: rgba(255, 255, 255, 0.7);
@@ -425,39 +511,36 @@ export default () => `
 
         /* Messages Area */
         .messages-container {
-            flex: 1; /* Takes available space */
-            overflow-y: auto;
-            padding: 20px 20px 5px 20px; /* More padding, less at bottom */
-            display: flex;
+            flex: 1; /* CRITICAL: Takes available space in .view-conversation */
+            overflow-y: auto; /* CRITICAL: Enables scrolling ONLY for messages */
+            padding: 20px 20px 5px 20px;
+            display: flex; /* To allow #messages to be centered or aligned */
             flex-direction: column;
+            min-height: 0; /* Allow shrinking */
         }
         /* Custom scrollbar for messages */
         .messages-container::-webkit-scrollbar { width: 8px; }
         .messages-container::-webkit-scrollbar-track { background: var(--bg-color); }
-        .messages-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
-        .messages-container::-webkit-scrollbar-thumb:hover { background: #555; }
+        .messages-container::-webkit-scrollbar-thumb { background: var(--scrollbar-color); border-radius: 4px; }
+        .messages-container::-webkit-scrollbar-thumb:hover { background: #666; }
 
 
         #messages {
             display: flex;
             flex-direction: column;
-            gap: 25px; /* Increased gap */
+            gap: 25px;
             width: 100%;
-            max-width: 800px; /* Limit message width for readability */
-            margin: 0 auto; /* Center messages */
-            padding-bottom: 15px; /* Space at the very bottom */
+            max-width: 800px;
+            margin: 0 auto; /* Center messages within scrollable container */
+            padding-bottom: 15px;
+            /* flex: 1; */ /* Removed - messages div grows naturally, container scrolls */
         }
 
         .message {
             display: flex;
             gap: 12px;
             align-items: flex-start;
-        }
-        .message[data-role="user"] {
-            /* Optional: Style user messages differently if needed */
-        }
-         .message[data-role="assistant"] {
-            /* Optional: Style assistant messages differently if needed */
+            /* animation: slideIn 0.3s ease forwards; */ /* Re-enable if desired, might impact scroll perf */
         }
 
         .message-avatar {
@@ -471,7 +554,7 @@ export default () => `
             justify-content: center;
             font-size: 16px;
             flex-shrink: 0;
-            margin-top: 2px; /* Align better with text */
+            margin-top: 2px;
         }
 
         .message-bubble {
@@ -484,7 +567,7 @@ export default () => `
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 6px; /* Space between header and content */
+            margin-bottom: 6px;
         }
         .message-header .role {
             font-weight: 700;
@@ -495,29 +578,39 @@ export default () => `
             background: var(--surface-color);
             padding: 12px 15px;
             border-radius: 10px;
-            border-top-left-radius: 0; /* Give it a bubble shape */
+            border-top-left-radius: 0;
             line-height: 1.6;
+            overflow-wrap: break-word; /* Wrap long words/strings */
+            word-break: break-word; /* Ensure breaks happen */
         }
         .message[data-role="user"] .message-content {
-            background: var(--accent-color); /* Different bg for user */
+            background: var(--accent-color);
             color: white;
             border-top-left-radius: 10px;
-            border-top-right-radius: 0; /* Flip bubble shape */
+            border-top-right-radius: 0;
         }
-        /* Adjust code block styling within messages */
+        /* Code block styling within messages */
         .message-content pre {
-            background-color: var(--bg-color); /* Darker bg for code */
+            background-color: var(--bg-color);
             padding: 15px;
             border-radius: 8px;
-            overflow-x: auto;
-            margin: 10px 0;
+            overflow-x: auto; /* Horizontal scroll for code */
+            /* margin: 10px 0; */ /* Removed margin, handled by wrapper */
             border: 1px solid var(--border-color);
+            /* Custom scrollbar for code blocks */
+            scrollbar-width: thin;
+            scrollbar-color: var(--scrollbar-color) var(--bg-color);
         }
+        .message-content pre::-webkit-scrollbar { height: 6px; }
+        .message-content pre::-webkit-scrollbar-track { background: var(--bg-color); }
+        .message-content pre::-webkit-scrollbar-thumb { background-color: var(--scrollbar-color); border-radius: 3px; }
+
         .message-content pre code {
             background: none;
             padding: 0;
-            color: inherit; /* Inherit color from highlightjs */
+            color: inherit;
             font-size: 0.9em;
+            white-space: pre; /* Preserve whitespace and prevent wrapping */
         }
         .message-content p:first-child { margin-top: 0; }
         .message-content p:last-child { margin-bottom: 0; }
@@ -544,8 +637,8 @@ export default () => `
             padding: 10px 15px;
             background: var(--surface-color);
             border-radius: 10px;
-            border-top-left-radius: 0; /* Match bubble shape */
-            align-self: flex-start; /* Align to left */
+            border-top-left-radius: 0;
+            align-self: flex-start;
         }
         .typing-indicator span {
             width: 8px;
@@ -575,66 +668,81 @@ export default () => `
         /* Responsive Design */
         @media (max-width: 767px) {
             body {
-                /* No major changes needed as main already flexes */
+                height: 100vh; /* Ensure full height on mobile */
             }
             header {
-                height: 60px; /* Slightly smaller header */
+                height: 60px;
                 padding: 0 15px;
             }
             #menu-toggle {
-                display: block; /* Show menu button */
+                display: block;
             }
             .sidebar {
                 position: fixed;
                 top: 0;
                 left: 0;
-                width: 280px; /* Fixed width when open */
-                height: 100%;
+                width: 280px;
+                height: 100%; /* Full height overlay */
                 transform: translateX(-100%);
                 z-index: 1000;
-                border-right: none; /* Remove border when overlaying */
+                border-right: none;
                 box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
+                /* Height calculation removed, now it's full height */
             }
             .sidebar.open {
                 transform: translateX(0);
             }
             #close-sidebar {
-                display: inline-flex; /* Show close button */
+                display: inline-flex;
             }
             .content {
-                padding: 10px; /* Less padding */
+                 /* Removed padding */
+                 height: calc(100vh - var(--header-height)); /* Ensure content fills below header */
             }
             .view {
-                max-width: 100%;
+                 padding: 15px; /* Slightly less padding in simple views */
+                 max-width: 100%; /* Allow forms to take more width */
             }
             #user-email {
-                display: none; /* Hide email on small screens */
+                display: none;
             }
             #messages {
-                max-width: 100%; /* Full width on mobile */
+                max-width: 100%;
             }
             #send-form {
                 margin: 0 10px 10px 10px; /* Adjust margin */
+                width: calc(100% - 20px);
                 padding: 10px;
             }
-            .sidebar-header-actions {
-                /* Stack buttons on mobile if needed, though side-by-side might still fit */
-                 /* flex-direction: column; */
-                 /* align-items: stretch; */
-            }
             .message-content {
-                 font-size: 15px; /* Slightly smaller text on mobile */
+                 font-size: 15px;
+            }
+             /* Adjust message container padding on mobile */
+            .messages-container {
+                padding: 15px 10px 5px 10px;
             }
         }
 
         @media (min-width: 768px) {
             .sidebar {
                 display: flex; /* Ensure it's visible */
+                height: calc(100vh - var(--header-height)); /* Sidebar fills height below header */
+                position: static; /* Not fixed on desktop */
+                transform: none; /* Ensure no transform */
+                box-shadow: none; /* No shadow */
+                border-right: 1px solid var(--border-color);
             }
+             /* Ensure content fills space next to sidebar */
+             .content {
+                 height: calc(100vh - var(--header-height));
+             }
         }
     </style>
 </head>
-<body class="logged-out"> <!-- Start as logged-out -->
+<body class="loading logged-out"> <!-- Start loading and logged-out -->
+    <div id="loading-overlay">
+        <i class="fas fa-spinner fa-spin"></i> <!-- Loading Spinner -->
+    </div>
     <header>
         <button id="menu-toggle"><i class="fas fa-bars"></i></button>
         <h1><i class="fas fa-brain" style="margin-right: 8px; color: var(--accent-color);"></i>Genius System</h1>
@@ -657,10 +765,13 @@ export default () => `
             <div class="sidebar-content">
                 <div id="convo-list"></div>
             </div>
+            <div class="sidebar-footer">
+                 <button id="sidebar-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
         </div>
         <div class="content">
             <!-- Login View -->
-            <div class="view view-login active"> <!-- Start with login active -->
+            <div class="view view-login"> <!-- Removed active class - handled by JS -->
                  <div class="welcome-text">
                     <h2>Welcome to Genius System</h2>
                     <p>Your intelligent assistant for conversations, code generation, and more. Log in or register to begin.</p>
@@ -689,7 +800,7 @@ export default () => `
                 <h2>Verify Email</h2>
                  <p style="margin-bottom: 20px; color: var(--text-muted);">Enter the code sent to your email address.</p>
                 <form id="verify-form">
-                    <input type="email" id="verify-email" placeholder="Email" required readonly style="background-color: #2d2d2d;"> <!-- Readonly email -->
+                    <input type="email" id="verify-email" placeholder="Email" required readonly style="background-color: #2d2d2d;">
                     <input type="text" id="verify-code" placeholder="Verification Code" required>
                     <button type="submit"><i class="fas fa-check-circle"></i> Verify</button>
                 </form>
@@ -706,12 +817,11 @@ export default () => `
 
             <!-- Conversation View -->
             <div class="view view-conversation">
-                <!-- Removed title and back button - info is in sidebar/header -->
                 <div class="messages-container">
                     <div id="messages"></div>
                 </div>
                 <form id="send-form">
-                    <textarea id="message-input" placeholder="Type your message... (Shift+Enter for new line)" rows="1"></textarea> <!-- Start with rows="1" -->
+                    <textarea id="message-input" placeholder="Type your message... (Shift+Enter for new line)" rows="1"></textarea>
                     <button type="submit" id="send-button"><i class="fas fa-paper-plane"></i></button>
                 </form>
             </div>
@@ -724,12 +834,16 @@ export default () => `
             tasklists: true,
             strikethrough: true,
             simplifiedAutoLink: true,
-            openLinksInNewWindow: true // Open links in new tab
+            openLinksInNewWindow: true,
+            backslashEscapesHTMLTags: true // Helps with rendering code containing HTML
         });
+        // Tell Highlight.js to ignore unrecognized languages and not log warnings
+        hljs.configure({ ignoreUnrecognizedLanguage: true });
+
 
         // Application State
         const state = {
-            currentView: 'login', // Start at login
+            currentView: null, // Determined on load
             jwt: null,
             user: null,
             conversations: [],
@@ -738,10 +852,11 @@ export default () => `
         };
 
         let typingIndicator = null;
-        let activeRequestController = null; // To potentially cancel requests
+        let activeRequestController = null;
 
         // DOM Elements
         const body = document.body;
+        const loadingOverlay = document.getElementById('loading-overlay');
         const sidebar = document.querySelector('.sidebar');
         const backdrop = document.querySelector('.backdrop');
         const messageInput = document.getElementById('message-input');
@@ -750,17 +865,24 @@ export default () => `
         const messagesDiv = document.getElementById('messages');
         const userEmailSpan = document.getElementById('user-email');
         const logoutButton = document.getElementById('logout');
+        const sidebarLogoutButton = document.getElementById('sidebar-logout');
         const convoListDiv = document.getElementById('convo-list');
-        const convoTitleSpan = document.getElementById('convo-title'); // Keep if needed elsewhere, though removed from view
 
         // Utility Functions
         function setView(viewName, convoId = null) {
-            document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-            const targetView = document.querySelector(\`.view-\${viewName}\`);
-            if(targetView) {
-                targetView.classList.add('active');
-            }
-            state.currentView = viewName;
+            if (state.currentView === viewName && viewName !== 'conversation') return; // Avoid unnecessary updates unless it's convo switching
+
+             document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+             const targetView = document.querySelector(\`.view-\${viewName}\`);
+             if(targetView) {
+                 targetView.classList.add('active');
+             } else {
+                 // Fallback or error handling if view not found
+                 console.error(\`View "\${viewName}" not found.\`);
+                 document.querySelector('.view-dashboard')?.classList.add('active'); // Fallback to dashboard if possible
+                 viewName = 'dashboard'; // Correct the state
+             }
+             state.currentView = viewName;
 
             // Close sidebar on navigation in mobile view
             if (window.innerWidth < 768) {
@@ -768,20 +890,23 @@ export default () => `
                 backdrop.classList.remove('open');
             }
 
+            // Update URL hash and focus
+            let newHash = '#';
             if (viewName === 'conversation' && convoId) {
-                window.location.hash = \`#convo-\${convoId}\`;
+                newHash = \`#convo-\${convoId}\`;
                 messageInput.focus();
-                 // Ensure conversation item is selected in sidebar
                 highlightSelectedConvo(convoId);
-            } else if (viewName === 'dashboard' || viewName === 'login' || viewName === 'register' || viewName === 'verify') {
-                window.location.hash = \`#\${viewName}\`;
-                 // Deselect conversation item
-                highlightSelectedConvo(null);
-            } else {
-                 window.location.hash = '#'; // Fallback
+            } else if (['dashboard', 'login', 'register', 'verify'].includes(viewName)) {
+                newHash = \`#\${viewName}\`;
+                highlightSelectedConvo(null); // Deselect convo
             }
 
-             // Update body class based on login status
+            // Update hash only if it's different to avoid loop with hashchange listener
+             if (window.location.hash !== newHash) {
+                window.location.hash = newHash;
+            }
+
+             // Update body class based on login status (redundant but safe)
             if (state.jwt) {
                 body.classList.remove('logged-out');
                 body.classList.add('logged-in');
@@ -789,12 +914,17 @@ export default () => `
                 body.classList.add('logged-out');
                 body.classList.remove('logged-in');
             }
+
+            // Remove loading state once a view is set
+            body.classList.remove('loading');
+            // loadingOverlay.style.display = 'none'; // Handled by body class CSS
         }
 
         function updateUserInfo() {
-            if (state.user) {
+            if (state.user && state.user.email) {
                 userEmailSpan.textContent = state.user.email;
-                logoutButton.style.display = 'inline-flex'; // Use inline-flex for button
+                logoutButton.style.display = 'inline-flex';
+                // Sidebar logout button visibility is controlled by body class
             } else {
                 userEmailSpan.textContent = '';
                 logoutButton.style.display = 'none';
@@ -802,42 +932,46 @@ export default () => `
         }
 
         function adjustTextareaHeight() {
-            messageInput.style.height = 'auto'; // Reset height
+            // Temporarily reset height to auto to get the natural scrollHeight
+            messageInput.style.height = 'auto';
             let scrollHeight = messageInput.scrollHeight;
-            // Calculate max height based on style -- might need adjustment
-            const style = window.getComputedStyle(messageInput);
-            const maxHeight = parseInt(style.maxHeight, 10);
 
-            if (scrollHeight > maxHeight) {
-                 messageInput.style.height = \`\${maxHeight}px\`;
-                 messageInput.style.overflowY = 'auto'; // Ensure scrollbar is visible if needed
+            // Get computed style to read max-height property
+            const computedStyle = window.getComputedStyle(messageInput);
+            const maxHeight = parseInt(computedStyle.maxHeight, 10);
+
+            // If scrollHeight exceeds maxHeight, set height to maxHeight and enable scroll
+            if (maxHeight && scrollHeight > maxHeight) {
+                messageInput.style.height = \`\${maxHeight}px\`;
+                messageInput.style.overflowY = 'auto';
             } else {
-                 messageInput.style.height = \`\${scrollHeight}px\`;
-                 messageInput.style.overflowY = 'hidden'; // Hide scrollbar if not needed
+                // Otherwise, set height to scrollHeight and hide scrollbar
+                messageInput.style.height = \`\${scrollHeight}px\`;
+                messageInput.style.overflowY = 'hidden';
             }
         }
+
 
         function setSendingState(isSending) {
             messageInput.disabled = isSending;
             sendButton.disabled = isSending;
             if(isSending) {
-                 // Optionally add a class for more specific styling
                  messageInput.style.opacity = '0.7';
-                 sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; // Loading indicator
+                 sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             } else {
                  messageInput.style.opacity = '1';
-                 sendButton.innerHTML = '<i class="fas fa-paper-plane"></i>'; // Reset icon
-                 adjustTextareaHeight(); // Readjust height after sending
+                 sendButton.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                 adjustTextareaHeight();
                  messageInput.focus();
             }
         }
 
         function showTypingIndicator() {
-            if (typingIndicator) return; // Already showing
+            if (typingIndicator) return;
             typingIndicator = document.createElement('div');
-            // Typing indicator now part of the message structure for consistency
             typingIndicator.className = 'message';
-            typingIndicator.dataset.role = 'assistant'; // Treat like an assistant message visually
+            typingIndicator.dataset.role = 'assistant';
+            typingIndicator.id = 'typing-indicator-message'; // ID for easy removal
             typingIndicator.innerHTML = \`
                 <div class="message-avatar"><i class="fas fa-robot"></i></div>
                 <div class="message-bubble">
@@ -851,21 +985,84 @@ export default () => `
         }
 
         function removeTypingIndicator() {
-            if (typingIndicator) {
-                typingIndicator.remove();
-                typingIndicator = null;
+            const indicator = document.getElementById('typing-indicator-message');
+            if (indicator) {
+                indicator.remove();
+                typingIndicator = null; // Reset flag
             }
         }
 
         function scrollToBottom(force = false) {
-            const isScrolledToBottom = messagesContainer.scrollHeight - messagesContainer.clientHeight <= messagesContainer.scrollTop + 30; // Threshold
-             // Only auto-scroll if the user is already near the bottom or forcing
-            if (force || isScrolledToBottom) {
-                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            // Check if the user is scrolled near the bottom before auto-scrolling
+            const isNearBottom = messagesContainer.scrollHeight - messagesContainer.clientHeight <= messagesContainer.scrollTop + 100; // Increased threshold
+
+            if (force || isNearBottom) {
+                 // Use smooth scrolling for a nicer effect
+                 messagesContainer.scrollTo({
+                    top: messagesContainer.scrollHeight,
+                    behavior: 'smooth'
+                });
+                 // Fallback for immediate scroll if needed
+                 // messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
         }
 
-        // Event Handlers
+        function addCopyButtonsToCodeBlocks(element) {
+            element.querySelectorAll('pre').forEach((pre) => {
+                // Check if the wrapper already exists
+                if (pre.parentNode.classList.contains('code-block-wrapper')) {
+                    return; // Already wrapped, possibly from streaming update
+                }
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'code-block-wrapper';
+
+                const copyButton = document.createElement('button');
+                copyButton.className = 'copy-btn';
+                copyButton.innerHTML = '<i class="fas fa-copy"></i>';
+                copyButton.title = 'Copy code';
+                copyButton.addEventListener('click', () => {
+                    const code = pre.querySelector('code');
+                    const textToCopy = code ? code.innerText : pre.innerText;
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        copyButton.innerHTML = '<i class="fas fa-check"></i>';
+                        copyButton.title = 'Copied!';
+                        copyButton.classList.add('copied');
+                        setTimeout(() => {
+                            copyButton.innerHTML = '<i class="fas fa-copy"></i>';
+                            copyButton.title = 'Copy code';
+                            copyButton.classList.remove('copied');
+                        }, 1500);
+                    }).catch(err => {
+                        console.error('Failed to copy code: ', err);
+                        copyButton.title = 'Error copying';
+                    });
+                });
+
+                wrapper.appendChild(copyButton);
+                // Insert wrapper before pre, then move pre inside wrapper
+                pre.parentNode.insertBefore(wrapper, pre);
+                wrapper.appendChild(pre);
+            });
+        }
+
+         function triggerLogout() {
+             localStorage.removeItem('jwt');
+             state.jwt = null;
+             state.user = null;
+             state.conversations = [];
+             state.selectedConvo = null;
+             state.messages = [];
+             renderConversations(); // Clear sidebar
+             renderMessages(); // Clear messages view (though view will change)
+             updateUserInfo();
+             setView('login'); // Go back to login screen
+             // alert("Your session has expired or is invalid. Please log in again."); // Optional alert
+        }
+
+
+        // --- Event Handlers ---
+
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
@@ -882,22 +1079,35 @@ export default () => `
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    state.jwt = data.token; // Use jwt now
-                    state.user = { email };
-                    localStorage.setItem('jwt', data.token); // Store as jwt
+                    state.jwt = data.token;
+                    // Attempt to decode email from JWT (simple decode, no verification)
+                    try {
+                         // Basic decode: only works if email is directly in payload, which it might not be
+                         // const payload = JSON.parse(atob(data.token.split('.')[1]));
+                         // state.user = { email: payload.email || email }; // Use provided email as fallback
+                         // Safer: just store email from form for now. A /me endpoint is better.
+                         state.user = { email: email };
+                    } catch {
+                        state.user = { email: email }; // Fallback if decode fails
+                    }
+                    localStorage.setItem('jwt', data.token);
                     updateUserInfo();
-                    await loadConversations(); // Load convos *before* setting view
-                    setView('dashboard'); // Go to dashboard after login
+                    body.classList.remove('logged-out'); // Update body class immediately
+                    body.classList.add('logged-in');
+                    await loadConversations();
+                    await handleHashChange(); // Navigate based on hash or default to dashboard
                 } else {
                     alert(\`Login failed: \${data.message}\`);
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
                 }
             } catch (err) {
                 console.error('Login error:', err);
                 alert('An error occurred during login.');
-            } finally {
-                 button.disabled = false;
-                 button.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
             }
+            // No finally needed here as button state handled in success/fail paths
         });
 
         document.getElementById('register-form').addEventListener('submit', async (e) => {
@@ -917,7 +1127,7 @@ export default () => `
                 const data = await response.json();
                 if (response.ok) {
                     alert('Registration successful. Please check your email for the verification code.');
-                    document.getElementById('verify-email').value = email; // Pre-fill email
+                    document.getElementById('verify-email').value = email;
                     setView('verify');
                 } else {
                     alert(\`Registration failed: \${data.message}\`);
@@ -948,7 +1158,7 @@ export default () => `
                 const data = await response.json();
                 if (response.ok) {
                     alert('Email verified successfully! You can now log in.');
-                    document.getElementById('login-email').value = email; // Pre-fill login email
+                    document.getElementById('login-email').value = email;
                     setView('login');
                 } else {
                     alert(\`Verification failed: \${data.message}\`);
@@ -988,40 +1198,39 @@ export default () => `
                 console.error('Resend code error:', err);
                 alert('An error occurred while resending the code.');
             } finally {
-                button.disabled = false;
+                button.disabled = false; // Use finally to ensure re-enabling
                 button.innerHTML = '<i class="fas fa-redo"></i> Resend Verification Code';
+                // Add a cooldown visual state if desired
+                // setTimeout(() => { button.disabled = false; }, 45000); // Example
             }
         });
 
         document.getElementById('create-convo').addEventListener('click', async (e) => {
-            const title = prompt('Enter conversation title:', 'New Conversation');
-             if (!title || !title.trim()) return; // Handle empty or cancelled prompt
+            const title = prompt('Enter conversation title:', \`Chat \${new Date().toLocaleTimeString()}\`);
+             if (!title || !title.trim()) return;
 
             const button = e.target;
-            button.disabled = true; // Disable button during request
+            button.disabled = true;
 
             try {
                 const response = await fetch('/convo', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': \`Bearer \${state.jwt}\`, // Use jwt
+                        'Authorization': \`Bearer \${state.jwt}\`,
                     },
                     body: JSON.stringify({ title: title.trim() }),
                 });
-                const newConvo = await response.json(); // Assume API returns the new convo object {id, title, ...}
+                const newConvo = await response.json();
                 if (response.ok && newConvo && newConvo.id) {
-                    // Add to state *first*
+                    // Assume API returns {id, title, user_id, created_at, updated_at}
                     state.conversations.unshift(newConvo); // Add to beginning
                     state.selectedConvo = newConvo.id;
-                    state.messages = []; // Clear messages for new convo
+                    state.messages = [];
 
-                    // Update UI
-                    renderConversations(); // Re-render list
-                    // convoTitleSpan.textContent = newConvo.title; // Update title if displayed
-                    renderMessages(); // Render empty messages
+                    renderConversations(); // Update sidebar
+                    renderMessages(); // Clear messages area
                     setView('conversation', newConvo.id); // Switch view and update hash
-                     // highlightSelectedConvo is called within setView
                 } else {
                     alert(newConvo.message || 'Failed to create conversation.');
                 }
@@ -1029,7 +1238,7 @@ export default () => `
                 console.error('Create convo error:', err);
                 alert('An error occurred while creating the conversation.');
             } finally {
-                 button.disabled = false; // Re-enable button
+                 button.disabled = false;
             }
         });
 
@@ -1037,10 +1246,11 @@ export default () => `
             if (confirm('Are you sure you want to delete ALL conversations? This cannot be undone.')) {
                 const button = e.target;
                 button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                 try {
                     const response = await fetch('/convo/all', {
                         method: 'DELETE',
-                        headers: { 'Authorization': \`Bearer \${state.jwt}\` }, // Use jwt
+                        headers: { 'Authorization': \`Bearer \${state.jwt}\` },
                     });
                     if (response.ok) {
                         state.conversations = [];
@@ -1058,17 +1268,16 @@ export default () => `
                     alert('An error occurred while clearing conversations.');
                 } finally {
                     button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All';
                 }
             }
         });
 
-        // Removed Back to Dashboard button handler
-
         messageInput.addEventListener('input', adjustTextareaHeight);
         messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault(); // Prevent newline
-                document.getElementById('send-form').requestSubmit(); // Trigger form submission
+                e.preventDefault();
+                document.getElementById('send-form').requestSubmit();
             }
         });
 
@@ -1079,16 +1288,14 @@ export default () => `
 
             setSendingState(true);
 
-            // Add user message immediately
             state.messages.push({ role: 'user', content: messageContent });
-            renderMessages();
+            renderMessages(); // Render user message
             scrollToBottom(true); // Force scroll after adding user message
-            messageInput.value = ''; // Clear input immediately
-            adjustTextareaHeight(); // Reset height after clearing
+            messageInput.value = '';
+            adjustTextareaHeight();
 
             showTypingIndicator();
 
-            // Abort previous request if any
             if (activeRequestController) {
                 activeRequestController.abort();
             }
@@ -1100,13 +1307,13 @@ export default () => `
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': \`Bearer \${state.jwt}\`, // Use jwt
+                        'Authorization': \`Bearer \${state.jwt}\`,
                     },
                     body: JSON.stringify({ message: messageContent, stream: true }),
-                    signal: signal, // Pass the signal
+                    signal: signal,
                 });
 
-                removeTypingIndicator(); // Remove indicator once response starts
+                removeTypingIndicator();
 
                 if (!response.ok) {
                     const data = await response.json();
@@ -1119,80 +1326,95 @@ export default () => `
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                let assistantMessageContent = '';
+                let accumulatedRawContent = '';
                 const assistantMsg = { role: 'assistant', content: '' };
                 state.messages.push(assistantMsg);
-                renderMessages(); // Render the empty assistant message bubble
 
-                // Find the last message element (the one we just added) to update
-                 const lastMessageContentElement = messagesDiv.querySelector('.message:last-child .message-content');
+                // Create the message element structure immediately but leave content empty
+                 const messageDiv = createMessageElement(assistantMsg); // Use helper function
+                 messagesDiv.appendChild(messageDiv);
+                 const contentDiv = messageDiv.querySelector('.message-content'); // Get content div to update
+
+                 scrollToBottom(true); // Scroll the empty bubble into view
 
                 async function readStream() {
                     try {
                          while (true) {
                              const { done, value } = await reader.read();
                              if (done) {
-                                 activeRequestController = null; // Clear controller
-                                 // Final update with complete content for state and clipboard
-                                 assistantMsg.content = assistantMessageContent;
-                                 hljs.highlightAll(); // Ensure highlighting is applied after stream ends
+                                 activeRequestController = null;
+                                 // Final update to state
+                                 assistantMsg.content = accumulatedRawContent;
+                                 // Final render pass to ensure everything (like copy buttons) is correct
+                                 if (contentDiv) {
+                                    const finalHtml = showdownConverter.makeHtml(accumulatedRawContent);
+                                    contentDiv.innerHTML = finalHtml;
+                                    contentDiv.querySelectorAll('pre code').forEach(hljs.highlightElement); // Highlight all
+                                    addCopyButtonsToCodeBlocks(contentDiv); // Add copy buttons
+                                 }
                                  setSendingState(false);
                                  return;
                              }
 
                              const chunk = decoder.decode(value, { stream: true });
-                             const events = chunk.split('\\n\\n');
-
-                             for (const event of events) {
-                                 if (event.startsWith('data: ')) {
-                                     const dataString = event.substring(6);
-                                     if (dataString.trim()) { // Avoid processing empty data lines
+                             // Process Server-Sent Events (SSE)
+                             const lines = chunk.split('\\n');
+                             for (const line of lines) {
+                                if (line.startsWith('data: ')) {
+                                    const dataString = line.substring(6);
+                                     if (dataString.trim()) {
                                          try {
                                              const parsed = JSON.parse(dataString);
                                              if (parsed.message) {
-                                                 assistantMessageContent += parsed.message;
-                                                  // Update the DOM directly for performance
-                                                 if(lastMessageContentElement) {
-                                                     // Convert markdown chunk to HTML and append
-                                                     const htmlChunk = showdownConverter.makeHtml(parsed.message);
-                                                     // Create a temporary div to parse the htmlChunk
-                                                     const tempDiv = document.createElement('div');
-                                                     tempDiv.innerHTML = htmlChunk;
-                                                     // Append nodes, handling potential multiple elements from markdown (e.g., paragraphs)
-                                                     while(tempDiv.firstChild) {
-                                                         lastMessageContentElement.appendChild(tempDiv.firstChild);
-                                                     }
+                                                 accumulatedRawContent += parsed.message;
+                                                 // Update the DOM directly for performance
+                                                 if(contentDiv) {
+                                                     // Convert the *entire accumulated* markdown to HTML
+                                                     const currentHtml = showdownConverter.makeHtml(accumulatedRawContent);
+                                                     contentDiv.innerHTML = currentHtml;
 
-                                                     // Basic code block detection and highlighting trigger (might need refinement)
-                                                     if (lastMessageContentElement.querySelector('pre code:not(.hljs)')) {
-                                                          hljs.highlightElement(lastMessageContentElement.querySelector('pre code:not(.hljs)'));
-                                                     }
+                                                     // Re-apply highlighting to any *new or changed* code blocks
+                                                     contentDiv.querySelectorAll('pre code:not(.hljs)').forEach(hljs.highlightElement);
+
+                                                     // Add copy buttons (will re-add/check)
+                                                     addCopyButtonsToCodeBlocks(contentDiv);
                                                  }
-                                                 scrollToBottom(); // Scroll as content arrives
+                                                 scrollToBottom(); // Scroll smoothly as content arrives
+                                             } else if (parsed.done) {
+                                                 // Optional: Handle a specific 'done' message if backend sends one
+                                                 // console.log("Stream finished signal received.");
                                              }
                                          } catch (parseErr) {
-                                             console.error('Error parsing SSE data:', dataString, parseErr);
-                                              // Append raw data if parsing fails? Maybe show an error?
-                                              // For now, just log it.
+                                             console.warn('Error parsing SSE data chunk:', dataString, parseErr);
+                                             // Optionally append raw problematic chunk for debugging
+                                             // accumulatedRawContent += \`\\n[Parse Error: \${dataString}]\\n\`;
+                                             // if (contentDiv) contentDiv.innerHTML = showdownConverter.makeHtml(accumulatedRawContent);
                                          }
                                      }
-                                 }
-                             }
-                         }
+                                }
+                             } // end for lines
+                         } // end while
                     } catch (streamErr) {
-                        // Handle errors that occur during streaming (including abort)
                         if (streamErr.name === 'AbortError') {
-                            console.log('Fetch aborted');
-                             // Add a message indicating abortion if desired
-                             // assistantMsg.content += "\\n\\n*Request cancelled.*";
+                            console.log('Stream fetch aborted');
+                            if (!accumulatedRawContent) { // If aborted before any content received
+                                 messageDiv?.remove(); // Remove the empty assistant message bubble
+                                 // Remove from state as well
+                                 state.messages.pop();
+                            } else {
+                                 assistantMsg.content = accumulatedRawContent + "\\n\\n*(Request cancelled)*";
+                                 if(contentDiv) {
+                                     contentDiv.innerHTML = showdownConverter.makeHtml(assistantMsg.content);
+                                 }
+                            }
                         } else {
                             console.error('Error reading stream:', streamErr);
-                            assistantMsg.content = assistantMessageContent + "\\n\\n*Error receiving response.*"; // Update state with error
-                            if(lastMessageContentElement) {
-                                 lastMessageContentElement.innerHTML = showdownConverter.makeHtml(assistantMsg.content); // Update UI with error
+                            assistantMsg.content = accumulatedRawContent + "\\n\\n*Error receiving response.*";
+                            if(contentDiv) {
+                                 contentDiv.innerHTML = showdownConverter.makeHtml(assistantMsg.content);
                             }
                         }
-                        removeTypingIndicator();
+                        removeTypingIndicator(); // Ensure removed on error/abort
                         setSendingState(false);
                         activeRequestController = null;
                     }
@@ -1209,32 +1431,17 @@ export default () => `
                 removeTypingIndicator();
                 setSendingState(false);
                 activeRequestController = null;
+                 // Maybe remove the user message or add an error state? For now, just log.
             }
         });
 
+        document.getElementById('to-register').addEventListener('click', (e) => { e.preventDefault(); setView('register'); });
+        document.getElementById('to-login').addEventListener('click', (e) => { e.preventDefault(); setView('login'); });
 
-        document.getElementById('to-register').addEventListener('click', (e) => {
-            e.preventDefault();
-            setView('register');
-        });
+        // Logout Listeners (Header and Sidebar)
+        logoutButton.addEventListener('click', triggerLogout);
+        sidebarLogoutButton.addEventListener('click', triggerLogout);
 
-        document.getElementById('to-login').addEventListener('click', (e) => {
-            e.preventDefault();
-            setView('login');
-        });
-
-        document.getElementById('logout').addEventListener('click', () => {
-            localStorage.removeItem('jwt'); // Remove jwt
-            state.jwt = null;
-            state.user = null;
-            state.conversations = [];
-            state.selectedConvo = null;
-            state.messages = [];
-            renderConversations(); // Clear sidebar
-            renderMessages(); // Clear messages view
-            updateUserInfo();
-            setView('login'); // Go back to login screen
-        });
 
         // Mobile Sidebar Toggle
         document.getElementById('menu-toggle').addEventListener('click', () => {
@@ -1252,38 +1459,48 @@ export default () => `
             backdrop.classList.remove('open');
         });
 
-        // Conversation Management
+        // --- Conversation Management ---
+
         async function loadConversations() {
-            if (!state.jwt) return; // Don't load if not logged in
+            if (!state.jwt) return;
             try {
                 const response = await fetch('/convos', {
-                    headers: { 'Authorization': \`Bearer \${state.jwt}\` }, // Use jwt
+                    headers: { 'Authorization': \`Bearer \${state.jwt}\` },
                 });
-                 if (response.status === 401) { // Handle expired/invalid token
+                 if (response.status === 401) {
                      console.warn("Unauthorized fetching convos. Logging out.");
-                     triggerLogout();
+                     triggerLogout(); // Use centralized logout function
                      return;
                  }
-                const data = await response.json();
-                if (response.ok) {
-                    state.conversations = data || []; // Ensure it's an array
-                    renderConversations();
+                if (!response.ok) {
+                    // Handle non-401 errors gracefully
+                    console.error(\`Failed to load convos: \${response.status}\`);
+                    state.conversations = []; // Assume empty list on error
+                    // Optionally show an error message in the sidebar
+                    // convoListDiv.innerHTML = '<p style="color:var(--danger-color);">Error loading conversations.</p>';
                 } else {
-                    console.error('Failed to load convos:', data.message);
-                    // Don't alert, just log maybe? Or show a non-modal error.
+                    const data = await response.json();
+                    state.conversations = data || [];
                 }
+                renderConversations(); // Render whatever state we have (empty or populated)
             } catch (err) {
-                console.error('Load conversations error:', err);
-                // alert('An error occurred while loading conversations');
+                console.error('Load conversations fetch error:', err);
+                state.conversations = []; // Clear convos on fetch error
+                renderConversations(); // Reflect the error state in UI
+                // convoListDiv.innerHTML = '<p style="color:var(--danger-color);">Network error loading conversations.</p>';
             }
         }
 
         function renderConversations() {
             convoListDiv.innerHTML = ''; // Clear previous list
              if (!state.conversations || state.conversations.length === 0) {
-                 convoListDiv.innerHTML = '<p style="text-align: center; color: var(--text-muted); font-size: 14px;">No conversations yet.</p>';
+                 convoListDiv.innerHTML = '<p style="text-align: center; color: var(--text-muted); font-size: 14px; padding: 20px 0;">No conversations yet.</p>';
                  return;
              }
+
+            // Sort conversations, e.g., by updated_at descending (if available)
+             state.conversations.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+
 
             state.conversations.forEach(convo => {
                 const div = document.createElement('div');
@@ -1291,62 +1508,57 @@ export default () => `
                 div.dataset.id = convo.id;
 
                 const titleSpan = document.createElement('span');
-                titleSpan.textContent = convo.title || 'Untitled'; // Fallback title
-                titleSpan.title = convo.title || 'Untitled'; // Tooltip for long titles
+                titleSpan.textContent = convo.title || 'Untitled';
+                titleSpan.title = convo.title || 'Untitled';
 
-                // Click on the whole item (except delete button) to select
                 div.addEventListener('click', (e) => {
-                    // Prevent selection if delete button was clicked
-                     if (e.target.closest('.delete-convo-btn')) return;
+                     if (e.target.closest('.delete-convo-btn')) return; // Ignore clicks on delete button
 
-                    if (state.selectedConvo !== convo.id) { // Only load if not already selected
-                        state.selectedConvo = convo.id;
-                        // convoTitleSpan.textContent = convo.title; // Update title if displayed
-                        loadMessages(convo.id); // Load messages for the clicked convo
-                        setView('conversation', convo.id); // Switch view and hash
-                    } else {
-                        // If already selected, maybe just ensure view is correct (useful for hash changes)
-                        setView('conversation', convo.id);
-                    }
-                     // Highlight selection is handled by highlightSelectedConvo called within setView/handleHashChange
+                     // Only switch if not already selected, or if user clicks same convo again (useful to reload)
+                    // if (state.selectedConvo !== convo.id) {
+                         state.selectedConvo = convo.id;
+                         // No need to load messages here, handleHashChange will do it via setView
+                         setView('conversation', convo.id);
+                    // }
                 });
 
                 const deleteButton = document.createElement('button');
-                deleteButton.className = 'delete-convo-btn'; // Add class for event delegation
+                deleteButton.className = 'delete-convo-btn';
                 deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
                 deleteButton.title = 'Delete Conversation';
                 deleteButton.addEventListener('click', async (e) => {
-                     e.stopPropagation(); // Prevent convo item click event
+                     e.stopPropagation();
                     if (confirm(\`Are you sure you want to delete "\${convo.title || 'Untitled'}"?\`)) {
-                        deleteButton.disabled = true; // Disable button during delete
+                        deleteButton.disabled = true;
+                        deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                         try {
                             const response = await fetch(\`/convo/\${convo.id}\`, {
                                 method: 'DELETE',
-                                headers: { 'Authorization': \`Bearer \${state.jwt}\` }, // Use jwt
+                                headers: { 'Authorization': \`Bearer \${state.jwt}\` },
                             });
                             if (response.ok) {
-                                // Remove from state and UI without full reload
                                 state.conversations = state.conversations.filter(c => c.id !== convo.id);
                                 div.remove(); // Remove element directly
-                                if (state.selectedConvo === convo.id) {
+                                if (state.selectedConvo == convo.id) { // Use == for potential type difference
                                     state.selectedConvo = null;
                                     state.messages = [];
                                     renderMessages();
                                     setView('dashboard');
                                 }
-                                // If no convos left, show message
                                 if (state.conversations.length === 0) {
-                                     renderConversations();
+                                     renderConversations(); // Show "No conversations" message
                                 }
                             } else {
                                 const data = await response.json();
                                 alert(\`Failed to delete conversation: \${data.message}\`);
-                                deleteButton.disabled = false; // Re-enable on failure
+                                deleteButton.disabled = false;
+                                deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
                             }
                         } catch (err) {
                             console.error('Delete convo error:', err);
                             alert('An error occurred while deleting conversation.');
-                            deleteButton.disabled = false; // Re-enable on error
+                            deleteButton.disabled = false;
+                            deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
                         }
                     }
                 });
@@ -1354,200 +1566,194 @@ export default () => `
                 div.appendChild(deleteButton);
                 convoListDiv.appendChild(div);
             });
-             // Highlight after rendering
-             highlightSelectedConvo(state.selectedConvo);
+             highlightSelectedConvo(state.selectedConvo); // Highlight after rendering
         }
 
          function highlightSelectedConvo(convoId) {
             document.querySelectorAll('.convo-item').forEach(item => {
-                item.classList.remove('selected');
-                if (item.dataset.id === String(convoId)) { // Compare as strings
-                    item.classList.add('selected');
-                }
+                item.classList.toggle('selected', item.dataset.id === String(convoId));
             });
         }
 
         async function loadMessages(convoId) {
-             if (!state.jwt) return;
-            messagesDiv.innerHTML = '<div style="text-align: center; margin-top: 50px;"><i class="fas fa-spinner fa-spin fa-2x" style="color: var(--text-muted);"></i><p style="color: var(--text-muted);">Loading messages...</p></div>'; // Loading indicator
-            try {
+             if (!state.jwt || !convoId) return;
+
+             // Ensure the conversation view is active before showing loading state
+             if (state.currentView !== 'conversation') {
+                 setView('conversation', convoId); // Switch view first
+             }
+
+             // Find the convo title from state
+             const currentConvo = state.conversations.find(c => String(c.id) === String(convoId));
+             // Update title if needed (e.g., if a title element exists)
+             // convoTitleSpan.textContent = currentConvo ? currentConvo.title : 'Loading...';
+
+             messagesDiv.innerHTML = '<div style="text-align: center; margin-top: 50px;"><i class="fas fa-spinner fa-spin fa-2x" style="color: var(--text-muted);"></i><p style="color: var(--text-muted);">Loading messages...</p></div>';
+             try {
                 const response = await fetch(\`/convo/\${convoId}\`, {
-                    headers: { 'Authorization': \`Bearer \${state.jwt}\` }, // Use jwt
+                    headers: { 'Authorization': \`Bearer \${state.jwt}\` },
                 });
                  if (response.status === 401) {
                      console.warn("Unauthorized fetching messages. Logging out.");
                      triggerLogout();
                      return;
                  }
-                const data = await response.json();
-                if (response.ok) {
-                    state.messages = data || []; // Ensure it's an array
-                    renderMessages();
-                    scrollToBottom(true); // Force scroll to bottom after loading
-                } else {
-                    alert(\`Failed to load messages: \${data.message}\`);
+                if (!response.ok) {
+                     const data = await response.json().catch(() => ({})); // Try to get error message
+                     alert(\`Failed to load messages: \${data.message || response.statusText}\`);
                      messagesDiv.innerHTML = '<p style="text-align: center; color: var(--danger-color);">Failed to load messages.</p>';
+                     state.messages = []; // Clear messages state on error
+                 } else {
+                    const data = await response.json();
+                    state.messages = data || [];
+                    renderMessages(); // Render the loaded messages
+                    // Scroll to bottom only after messages are rendered
+                     setTimeout(() => scrollToBottom(true), 50); // Small delay allows render paint
                 }
             } catch (err) {
-                console.error('Load messages error:', err);
+                console.error('Load messages fetch error:', err);
                 alert('An error occurred while loading messages.');
                  messagesDiv.innerHTML = '<p style="text-align: center; color: var(--danger-color);">An error occurred while loading messages.</p>';
+                 state.messages = []; // Clear messages state on error
             }
         }
 
-        function renderMessages() {
-            // Keep track of current scroll position if needed for smarter scrolling
-             // const currentScrollTop = messagesContainer.scrollTop;
-             // const currentScrollHeight = messagesContainer.scrollHeight;
-             // const isAtBottom = currentScrollHeight - currentScrollTop <= messagesContainer.clientHeight + 10;
+        // Helper to create message DOM element
+        function createMessageElement(msg) {
+            if (!msg || !msg.role || typeof msg.content === 'undefined') {
+                console.warn("Skipping invalid message object:", msg);
+                return null; // Return null for invalid messages
+            }
 
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.dataset.role = msg.role;
+
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'message-avatar';
+            avatarDiv.innerHTML = msg.role === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'message-bubble';
+
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'message-header';
+
+            const roleSpan = document.createElement('span');
+            roleSpan.className = 'role';
+            roleSpan.textContent = msg.role.charAt(0).toUpperCase() + msg.role.slice(1);
+            headerDiv.appendChild(roleSpan);
+
+            // Only add message copy button to non-empty assistant messages
+            if (msg.role === 'assistant' && msg.content.trim()) {
+                const copyButton = document.createElement('button');
+                copyButton.className = 'copy-btn';
+                copyButton.innerHTML = '<i class="fas fa-copy"></i>';
+                copyButton.title = 'Copy message';
+                copyButton.addEventListener('click', () => {
+                    navigator.clipboard.writeText(msg.content).then(() => {
+                         copyButton.innerHTML = '<i class="fas fa-check"></i>';
+                         copyButton.title = 'Copied!';
+                         copyButton.classList.add('copied');
+                         setTimeout(() => {
+                            copyButton.innerHTML = '<i class="fas fa-copy"></i>';
+                            copyButton.title = 'Copy message';
+                            copyButton.classList.remove('copied');
+                         }, 1500);
+                    }).catch(err => {
+                        console.error('Failed to copy: ', err);
+                        alert('Failed to copy message');
+                    });
+                });
+                headerDiv.appendChild(copyButton);
+            }
+
+            bubbleDiv.appendChild(headerDiv);
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+
+            if (msg.role === 'assistant') {
+                const rawHtml = showdownConverter.makeHtml(msg.content || '');
+                contentDiv.innerHTML = rawHtml;
+                // Apply highlighting and add code block copy buttons AFTER setting innerHTML
+                contentDiv.querySelectorAll('pre code').forEach(hljs.highlightElement);
+                addCopyButtonsToCodeBlocks(contentDiv);
+            } else {
+                contentDiv.textContent = msg.content || '';
+            }
+            bubbleDiv.appendChild(contentDiv);
+
+            messageDiv.appendChild(avatarDiv);
+            messageDiv.appendChild(bubbleDiv);
+            return messageDiv;
+        }
+
+        function renderMessages() {
             messagesDiv.innerHTML = ''; // Clear previous messages
-            if (!state.messages || state.messages.length === 0 && state.currentView === 'conversation') {
-                 messagesDiv.innerHTML = '<p style="text-align: center; color: var(--text-muted); margin-top: 30px;">Send a message to start the conversation.</p>';
+            if (!state.messages || state.messages.length === 0) {
+                 if (state.currentView === 'conversation') { // Only show prompt if in convo view
+                    messagesDiv.innerHTML = '<p style="text-align: center; color: var(--text-muted); margin-top: 30px;">Send a message to start the conversation.</p>';
+                 }
                  return;
             }
 
             state.messages.forEach(msg => {
-                if (!msg || !msg.role || typeof msg.content === 'undefined') {
-                     console.warn("Skipping invalid message object:", msg);
-                     return; // Skip malformed messages
-                }
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message';
-                messageDiv.dataset.role = msg.role; // Add role as data attribute
-
-                const avatarDiv = document.createElement('div');
-                avatarDiv.className = 'message-avatar';
-                avatarDiv.innerHTML = msg.role === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
-
-                const bubbleDiv = document.createElement('div');
-                bubbleDiv.className = 'message-bubble';
-
-                const headerDiv = document.createElement('div');
-                headerDiv.className = 'message-header';
-
-                const roleSpan = document.createElement('span');
-                roleSpan.className = 'role';
-                roleSpan.textContent = msg.role.charAt(0).toUpperCase() + msg.role.slice(1);
-                headerDiv.appendChild(roleSpan);
-
-                // Only add copy button to non-empty assistant messages
-                if (msg.role === 'assistant' && msg.content.trim()) {
-                    const copyButton = document.createElement('button');
-                    copyButton.className = 'copy-btn';
-                    copyButton.innerHTML = '<i class="fas fa-copy"></i>'; // Icon only
-                    copyButton.title = 'Copy message';
-                    copyButton.addEventListener('click', () => {
-                        navigator.clipboard.writeText(msg.content).then(() => {
-                             copyButton.innerHTML = '<i class="fas fa-check"></i>'; // Check icon
-                             copyButton.title = 'Copied!';
-                             copyButton.classList.add('copied');
-                             setTimeout(() => {
-                                copyButton.innerHTML = '<i class="fas fa-copy"></i>';
-                                copyButton.title = 'Copy message';
-                                copyButton.classList.remove('copied');
-                             }, 1500); // Revert after 1.5 seconds
-                        }).catch(err => {
-                            console.error('Failed to copy: ', err);
-                            alert('Failed to copy message');
-                        });
-                    });
-                    headerDiv.appendChild(copyButton);
-                }
-
-                bubbleDiv.appendChild(headerDiv);
-
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'message-content';
-
-                if (msg.role === 'assistant') {
-                    // Render Markdown only for assistant
-                     const rawHtml = showdownConverter.makeHtml(msg.content || ''); // Ensure content exists
-                    contentDiv.innerHTML = rawHtml;
-                     // Apply highlighting to all code blocks within this message content
-                     contentDiv.querySelectorAll('pre code').forEach((block) => {
-                        hljs.highlightElement(block);
-                    });
-                } else {
-                    // Display user message as plain text (escaped by browser)
-                    contentDiv.textContent = msg.content || '';
-                }
-                bubbleDiv.appendChild(contentDiv);
-
-                messageDiv.appendChild(avatarDiv);
-                messageDiv.appendChild(bubbleDiv);
-                messagesDiv.appendChild(messageDiv);
+                 const messageElement = createMessageElement(msg);
+                 if (messageElement) { // Only append if element creation was successful
+                     messagesDiv.appendChild(messageElement);
+                 }
             });
 
-            // Restore scroll position intelligently or scroll to bottom
-             // if (isAtBottom) {
-             //     scrollToBottom(true); // Force scroll if was at bottom
-             // } else {
-                 // messagesContainer.scrollTop = currentScrollTop; // Try to maintain position if user scrolled up
-             // }
-              // Simplified: Always scroll to bottom for now, can be refined later.
-             // scrollToBottom(true); // Moved this call elsewhere (after load, after send)
+             // Scroll handling moved to loadMessages and send message handler
+             // scrollToBottom(true); // Don't auto-scroll on every render, only on load/new message
         }
 
-        function triggerLogout() {
-             localStorage.removeItem('jwt');
-             state.jwt = null;
-             state.user = null;
-             // Clear sensitive state, maybe not conversations if we want to keep them visually until reload?
-             state.selectedConvo = null;
-             state.messages = [];
-             updateUserInfo();
-             setView('login');
-             alert("Your session has expired or is invalid. Please log in again.");
-        }
 
-        // Hash Change Handler
+        // --- Hash Change Handler ---
         async function handleHashChange() {
+             // Always remove loading state when hash changes, as navigation implies loading is done
+             body.classList.remove('loading');
+
              if (!state.jwt) {
-                // If not logged in, only allow login/register/verify routes
-                 const allowedRoutes = ['#login', '#register', '#verify'];
-                 if (!allowedRoutes.includes(window.location.hash) && window.location.hash !== '') {
-                     setView('login'); // Redirect to login
-                 } else if (window.location.hash === '#register') {
+                 // Not logged in - redirect to login unless hash is register/verify
+                 const hash = window.location.hash;
+                 if (hash === '#register') {
                      setView('register');
-                 } else if (window.location.hash === '#verify') {
-                     // Allow going to verify, assuming email might be pre-filled
+                 } else if (hash === '#verify') {
                      setView('verify');
                  } else {
-                     setView('login'); // Default to login
+                      // Includes empty hash, #login, or any other hash
+                     setView('login');
                  }
                  return;
              }
 
-            // If logged in:
+            // --- Logged In User ---
             const hash = window.location.hash;
+
             if (hash.startsWith('#convo-')) {
-                const convoId = hash.substring(7); // Get ID after #convo-
-                 // Find convo in state (compare as string might be safer if IDs are numbers)
-                 const convoExists = state.conversations.find(c => String(c.id) === convoId);
+                const convoId = hash.substring(7);
+                const convoExists = state.conversations.find(c => String(c.id) === convoId);
 
                  if (convoExists) {
-                     if (state.selectedConvo !== convoId) { // Only load if different
-                        state.selectedConvo = convoId;
-                        // convoTitleSpan.textContent = convoExists.title; // Update title if needed
-                        await loadMessages(convoId);
-                        setView('conversation', convoId); // Set view *after* loading messages
-                     } else {
-                        // If already selected, just ensure view is correct
-                        setView('conversation', convoId);
+                     // Only load messages if the selected convo changes
+                     if (state.selectedConvo !== convoId) {
+                         state.selectedConvo = convoId;
+                         await loadMessages(convoId); // This will also call renderMessages and scroll
                      }
-                     highlightSelectedConvo(convoId); // Ensure highlighted
+                     setView('conversation', convoId); // Ensure view is correct and sidebar item highlighted
                  } else {
-                     // Convo ID in hash doesn't exist (maybe deleted?), go to dashboard
-                     console.warn(\`Conversation ID \${convoId} not found, redirecting to dashboard.\`);
+                     // Convo ID in hash doesn't exist in state, redirect
+                     console.warn(\`Conversation ID \${convoId} not found via hash, redirecting to dashboard.\`);
                      state.selectedConvo = null;
                      setView('dashboard');
                  }
             } else if (hash === '#dashboard') {
-                state.selectedConvo = null; // Deselect convo
+                state.selectedConvo = null;
                 setView('dashboard');
             } else if (hash === '#login' || hash === '#register' || hash === '#verify') {
-                 // Logged in user trying to access login/register? Redirect to dashboard.
+                 // Logged in user tried to access auth pages, redirect
                  setView('dashboard');
             } else {
                 // Default view for logged-in user (e.g., empty hash)
@@ -1555,50 +1761,48 @@ export default () => `
             }
         }
 
-        // Initialization
+        // --- Initialization ---
         window.addEventListener('load', async () => {
-            const savedJwt = localStorage.getItem('jwt'); // Check for jwt
+            const savedJwt = localStorage.getItem('jwt');
             if (savedJwt) {
                 state.jwt = savedJwt;
-                // Try to get user info (optional, could fetch /me endpoint)
-                // For now, just assume token means logged in, derive email later if needed
-                 // state.user = { email: 'Loading...' }; // Placeholder
-                 // updateUserInfo(); // Update immediately with placeholder
+                body.classList.remove('logged-out');
+                body.classList.add('logged-in');
 
-                 // Load conversations first
+                // Basic user info (can be improved with a /me endpoint)
+                // Try decoding JWT payload for email - THIS IS NOT SECURE verification, just display
+                 try {
+                    const base64Url = state.jwt.split('.')[1];
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                    }).join(''));
+                    const payload = JSON.parse(jsonPayload);
+                    // Assuming email might be in 'email' or 'sub' claim - adjust as needed
+                    state.user = { email: payload.email || payload.sub || 'User' };
+                } catch (e) {
+                    console.warn("Could not decode JWT for email display.", e);
+                    state.user = { email: 'User' }; // Fallback
+                }
+                updateUserInfo();
+
+                 // Load conversations *before* handling hash
                  await loadConversations();
 
-                 // Only then, handle the hash to potentially load messages
-                 await handleHashChange();
-
-                 // If still no user info, fetch it (example /me endpoint)
-                 /*
-                 try {
-                    const meResponse = await fetch('/me', { headers: { 'Authorization': \`Bearer \${state.jwt}\` } });
-                    if (meResponse.ok) {
-                        const userData = await meResponse.json();
-                        state.user = userData; // Assuming { email: '...' }
-                        updateUserInfo();
-                    } else if (meResponse.status === 401) {
-                         triggerLogout(); // Invalid token on load
-                    }
-                 } catch (err) { console.error("Failed to fetch user info", err); }
-                 */
-                 // Simplified: Assume JWT is valid for now, get email from login/future /me
-                 if (state.user) updateUserInfo(); // Update if user was set somehow (e.g. during login process if page wasn't reloaded)
-
+                 // Now handle the hash (which might load messages)
+                 await handleHashChange(); // This will also remove loading state
 
             } else {
-                setView('login'); // Start at login if no token
+                // No token, go to login (handleHashChange will do this, but setView is safer)
+                setView('login'); // This also removes loading state
             }
-            updateUserInfo(); // Final UI update based on initial state
-             adjustTextareaHeight(); // Initial adjustment for textarea
+
+             // Final UI updates just in case
+             updateUserInfo();
+             adjustTextareaHeight();
         });
 
         window.addEventListener('hashchange', handleHashChange);
-
-        // Add listener to adjust textarea on window resize potentially
-         // window.addEventListener('resize', adjustTextareaHeight);
 
     </script>
 </body>

@@ -9,6 +9,7 @@
         "genius": "dist/index.mjs"
     },
     "scripts": {
+        "genius": "npm run build && node dist/index.mjs",
         "build": "tsc -b"
     },
     "keywords": [],

@@ -771,8 +771,8 @@ app.post('/login', async (req: Request, res: Response) => {
 
 app.post('/convo', authenticate, async (req: Request & { user: { id: number } }, res: Response) => {
     try {
-        await db('convos').insert({ title: req.body.title, user_id: req.user.id });
-        res.json({ message: 'Conversation created successfully' });
+        const [id] = await db('convos').insert({ title: req.body.title, user_id: req.user.id });
+        res.json({ message: 'Conversation created successfully', title: req.body.title, id });
     } catch (err) {
         logger.error('Error in /convo:', err);
         res.status(500).json({ message: 'Internal server error' });
