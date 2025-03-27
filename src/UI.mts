@@ -173,7 +173,8 @@ export default () => `
         /* Shared view specifics */
         .view-shared-conversation #send-form { display: none; }
         .view-shared-conversation .messages-container {
-            /* Maybe add padding at top/bottom if header is different */
+            /* Style Adjust: Add slightly more top padding */
+            padding-top: 25px;
         }
         .shared-info-banner {
              background-color: var(--surface-hover);
@@ -282,7 +283,9 @@ export default () => `
         .convo-item.selected:hover { background: var(--accent-hover); }
         .convo-item span {
             flex: 1; white-space: nowrap; overflow: hidden;
-            text-overflow: ellipsis; margin-right: 5px; /* Reduce margin */
+            text-overflow: ellipsis;
+            /* Style Adjust: Increase space between title and buttons */
+            margin-right: 8px;
             font-size: 15px;
         }
         .convo-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
@@ -313,7 +316,7 @@ export default () => `
         .messages-container::-webkit-scrollbar-track { background: var(--bg-color); }
         .messages-container::-webkit-scrollbar-thumb { background: var(--scrollbar-color); border-radius: 4px; }
         .messages-container::-webkit-scrollbar-thumb:hover { background: #666; }
-        #messages {
+        #messages, #shared-messages { /* Apply common styles to both */
             display: flex; flex-direction: column; gap: 25px;
             width: 100%; max-width: 800px; margin: 0 auto; padding-bottom: 15px;
         }
@@ -453,10 +456,13 @@ export default () => `
             .content { height: calc(100vh - var(--header-height)); }
             .view { padding: 15px; max-width: 100%; }
             #user-email { display: none; } /* Keep hidden on mobile header */
-            #messages { max-width: 100%; }
+            #messages, #shared-messages { max-width: 100%; } /* Allow full width on mobile */
             #send-form { margin: 0 10px 10px 10px; width: calc(100% - 20px); padding: 10px; }
             .message-content { font-size: 15px; }
             .messages-container { padding: 15px 10px 5px 10px; }
+            .view-shared-conversation .messages-container {
+                padding-top: 15px; /* Reset shared top padding for mobile */
+            }
             .conversation-header h2 { font-size: 16px; margin-right: 10px; }
             .conversation-header-actions button { padding: 5px 8px; font-size: 13px; gap: 5px; }
             .modal { width: 95%; padding: 20px 25px; }
@@ -497,13 +503,14 @@ export default () => `
                 <h2>Conversations</h2>
                 <div class="sidebar-header-actions">
                     <button id="create-convo"><i class="fas fa-plus"></i> New Chat</button>
-                    <button id="clear-all" title="Delete All Conversations" class="danger"><i class="fas fa-trash-alt"></i> Clear All</button>
                 </div>
             </div>
             <div class="sidebar-content">
                 <div id="convo-list"></div>
             </div>
             <div class="sidebar-footer">
+                <button style="margin-bottom: 8px;" title="Buy me a beer" onclick="window.open('https://donate.stripe.com/aEUcMQ89H39xcBGeUU', '_blank')"> Buy me a beer 🍺</button>
+                <button style="margin-bottom: 8px;" id="clear-all" title="Delete All Conversations" class="danger"><i class="fas fa-trash-alt"></i> Clear all chats</button>
                 <button id="sidebar-logout" class="danger"><i class="fas fa-sign-out-alt"></i> Logout</button>
             </div>
         </div>
@@ -835,7 +842,7 @@ export default () => `
                 viewName = state.jwt ? 'dashboard' : 'login';
                 $(\`.view-\${ viewName }\`)?.classList.add('active');
             }
-            state.currentView = viewName;
+            state.currentView = viewName; // Update state AFTER view switch
             state.sharedConvoData = null; // Clear shared data when changing main view
 
             // Close sidebar on mobile navigation
@@ -919,11 +926,13 @@ export default () => `
                  const convoId = hash.substring(7);
                  const convoExists = state.conversations.find(c => String(c.id) === convoId);
                  if (convoExists) {
-                      // Load messages only if switching to a *different* convo or if messages aren't loaded
-                      if (String(state.selectedConvoId) !== convoId || state.messages.length === 0) {
-                          await loadMessages(convoId);
+                      const needsLoad = String(state.selectedConvoId) !== convoId || state.messages.length === 0;
+                      setView('conversation', { convoId }); // Set the view FIRST so state.currentView is correct
+
+                      if (needsLoad) {
+                          await loadMessages(convoId); // Now load messages
                       }
-                     setView('conversation', { convoId }); // Ensure view/state correct
+                      // *** FIX END ***
                  } else {
                      console.warn(\`Convo ID \${convoId} not found, redirecting.\`);
                       await showAlert('Not Found', \`Conversation with ID \${convoId} could not be found or accessed.\`);
@@ -1323,13 +1332,19 @@ export default () => `
         const debouncedScrollToBottom = debounce(scrollToBottom, 100); // Debounce smooth scroll
 
         function scrollToBottom(force = false) {
-            if (!messagesContainer) return;
-            const isNearBottom = messagesContainer.scrollHeight - messagesContainer.clientHeight <= messagesContainer.scrollTop + 150; // Generous threshold
+            // Use the correct container based on current view
+            const currentContainer = (state.currentView === 'shared-conversation')
+                ? $('.view-shared-conversation .messages-container')
+                : messagesContainer;
+
+            if (!currentContainer) return;
+
+            const isNearBottom = currentContainer.scrollHeight - currentContainer.clientHeight <= currentContainer.scrollTop + 150; // Generous threshold
 
             if (force || isNearBottom) {
                 // Use smooth scroll only if not forced, otherwise jump immediately
-                messagesContainer.scrollTo({
-                    top: messagesContainer.scrollHeight,
+                currentContainer.scrollTo({
+                    top: currentContainer.scrollHeight,
                     behavior: force ? 'auto' : 'smooth'
                 });
             }
@@ -1444,8 +1459,8 @@ export default () => `
                  div.appendChild(actionsDiv);
 
                  div.onclick = (e) => { // Use onclick for simplicity
-                      // Navigate to conversation
-                      setView('conversation', { convoId: convo.id });
+                      // Navigate to conversation using hash change, which triggers handleHashChange
+                      window.location.hash = \`#convo-\${convo.id}\`;
                  };
 
                  convoListDiv.appendChild(div);
@@ -1496,8 +1511,10 @@ export default () => `
                  state.messages = []; // Clear messages for new convo
 
                  renderConversations(); // Update sidebar
-                 renderMessages(); // Clear messages area in UI
-                 setView('conversation', { convoId: newConvo.id }); // Switch view
+                 // Set view *without* loading messages (it's new/empty)
+                 setView('conversation', { convoId: newConvo.id });
+                 renderMessages(); // Ensure messages area is cleared/shows placeholder
+
 
              } catch (err) {
                  console.error('Create convo error:', err);
@@ -1590,8 +1607,7 @@ export default () => `
                 if (String(state.selectedConvoId) === String(convoId)) {
                     state.selectedConvoId = null;
                     state.messages = [];
-                    renderMessages();
-                    setView('dashboard');
+                    setView('dashboard'); // setView clears messages UI internally
                 }
             } catch (err) {
                 console.error('Delete convo error:', err);
@@ -1627,8 +1643,7 @@ export default () => `
                  state.selectedConvoId = null;
                  state.messages = [];
                  renderConversations();
-                 renderMessages();
-                 setView('dashboard');
+                 setView('dashboard'); // setView clears messages UI internally
 
              } catch (err) {
                  console.error('Clear all convos error:', err);
@@ -1659,7 +1674,8 @@ export default () => `
 
         async function loadMessages(convoId) {
             if (!state.jwt || !convoId) return;
-             if (state.currentView !== 'conversation') return; // Don't load if not in convo view
+            // *** FIX: Removed guard clause: 'if (state.currentView !== 'conversation') return;' ***
+            // View is now set *before* this is called in handleHashChange
 
             // Abort previous requests and clear existing messages/indicators
              abortActiveRequest();
@@ -1794,7 +1810,13 @@ export default () => `
          }
 
         function renderMessages(targetDiv = messagesDiv) {
+            // Ensure targetDiv exists (could be null if called before DOM ready in edge cases)
+            if (!targetDiv) {
+                 console.warn("renderMessages called with null targetDiv");
+                 return;
+            }
             targetDiv.innerHTML = ''; // Clear previous messages
+
              const messagesToRender = (targetDiv === sharedMessagesDiv && state.sharedConvoData)
                  ? state.sharedConvoData.messages
                  : state.messages;
@@ -1814,7 +1836,7 @@ export default () => `
                      targetDiv.appendChild(messageElement);
                  }
              });
-             // Scrolling handled by callers (loadMessages, send handler)
+             // Scrolling handled by callers (loadMessages, send handler, stream handler)
         }
 
          function updateConversationHeader(convoId) {
@@ -1945,10 +1967,7 @@ export default () => `
                  renderMessages(sharedMessagesDiv); // Render into the dedicated shared div
                  setView('shared-conversation', { token }); // Set the view last
                  // Scroll to bottom after loading shared messages
-                 setTimeout(() => {
-                      const container = $('.view-shared-conversation .messages-container');
-                      if (container) container.scrollTop = container.scrollHeight;
-                 }, 50);
+                 setTimeout(() => scrollToBottom(true), 50);
 
 
              } catch (err) {
@@ -1986,7 +2005,8 @@ export default () => `
                 localStorage.setItem('jwt', data.token);
                 await fetchUserInfo(); // Fetch user details AFTER getting token
                 await loadConversations();
-                setView('dashboard'); // Go to dashboard after login
+                // Navigate via hash change to load messages correctly if needed
+                window.location.hash = '#dashboard';
 
             } catch (err) {
                 console.error('Login error:', err);
@@ -2174,8 +2194,8 @@ export default () => `
         $$('#to-register, #to-login, #to-forgot-password, #back-to-login-verify, #back-to-login-forgot, #back-to-login-reset').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const targetView = e.target.closest('a')?.getAttribute('href')?.substring(1); // Get view name from href
-                if (targetView) setView(targetView);
+                const targetHash = e.target.closest('a')?.getAttribute('href'); // Get href like #login
+                if (targetHash) window.location.hash = targetHash; // Navigate via hash change
             });
         });
 
@@ -2237,7 +2257,7 @@ export default () => `
                 ]);
                  // Only proceed to handle hash if token was *not* invalidated by fetchUserInfo
                  if (state.jwt) {
-                     await handleHashChange(); // Determine view based on hash/state
+                     await handleHashChange(); // Determine view based on hash/state (will now load messages if #convo)
                  } else {
                      // fetchUserInfo triggered logout
                      setView('login');
