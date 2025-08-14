@@ -135,7 +135,7 @@ class OpenAIProvider implements AIProvider {
             messages: cleanMessages,
             stream: options.stream,
         };
-        if (completionOptions.model.startsWith('o')) {
+        if (completionOptions.model.startsWith('o') || completionOptions.model.includes('gpt-5')) {
             completionOptions.max_completion_tokens = options.maxTokens
             completionOptions.messages = cleanMessages.map(x => {
                 if (x.role === 'system') {
